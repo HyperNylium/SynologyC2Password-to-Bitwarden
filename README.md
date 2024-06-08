@@ -1,7 +1,7 @@
-# SynologyC2Password to Bitwarden formatter
+# SynologyC2Password to Bitwarden formatter/translater
 
 ## Description
-This script will convert the Synology C2 Password export (.csv) file to a Bitwarden/Vaultwarden (.csv) importable format.
+This script will convert/translate the Synology C2 Password export (.csv) file to a Bitwarden/Vaultwarden (.csv) importable format.
 
 ## Getting Started
 We first need to export those juicy passwords from Synology C2 Password. So, lets do that!
@@ -11,13 +11,13 @@ We first need to export those juicy passwords from Synology C2 Password. So, let
     1.3. Click on `Export`. \
     1.4. Click on `Download`. \
     1.5. Save the file to your computer. \
-![export-from-syno-step1](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden-formatter/main/imgs/export-from-syno-step1.png)
-![export-from-syno-step2](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden-formatter/main/imgs/export-from-syno-step2.png)
+![export-from-syno-step1](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden/main/imgs/export-from-syno-step1.png)
+![export-from-syno-step2](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden/main/imgs/export-from-syno-step2.png)
 
 This is where Linux users and Windows part ways. Please follow the instructions for your operating system.
 
 ### Windows
-1. Download the latest version of `syno2bw.exe` from the [releases page](https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden-formatter/releases) \
+1. Download the latest version of `syno2bw.exe` from the [releases page](https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden/releases) \
     1.1 Please do note that you will get a warning from Windows Defender SmartScreen. This is because I am not a verified publisher. You can safely ignore this warning by clicking on `More info` and then `Run anyway`.
 2. Bring your Synology C2 Password export file to the same directory as the executable.
 3. Run the executable by double-clicking on it and follow the instructions.
@@ -34,8 +34,8 @@ This is where Linux users and Windows part ways. Please follow the instructions 
     ```
     1.5 Run `source ~/.bashrc`
 2. Clone this repository: \
-    2.1 Run `git clone https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden-formatter.git` \
-    2.2 Run `cd SynologyC2Password-to-Bitwarden-formatter`
+    2.1 Run `git clone https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden.git` \
+    2.2 Run `cd SynologyC2Password-to-Bitwarden`
 3. Install the required Python packages: \
     3.1 Run `pip311 install -r requirements.txt`
 4. Bring your Synology C2 Password export file to the same directory as the script: \
