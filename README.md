@@ -49,6 +49,18 @@ Notes:
 - I may or may not make a bash script later in the future for Linux users just so it's more easier to use. But for now, this will do.
 
 
+## Import to Bitwarden/Vaultwarden
+1. Open your Bitwarden/Vaultwarden web interface.
+2. Click on the `Tools` tab at the top. \
+![export-from-syno-step2](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden/main/imgs/import-into-bitwarden1.png)
+3. Click on `Import Data` from the `Tools` box on the left. \
+![export-from-syno-step2](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden/main/imgs/import-into-bitwarden2.png)
+4. Set `import destination` to `My vault` or where ever you want to import the passwords to.
+5. Set `Folder` to `-- Select Folder --` or where ever you want to import the passwords to.
+6. Set `File format` to `Bitwarden (.csv)`.
+7. Click on `Choose file` and select the `bitwarden_file.csv` file that was created by the script/executable.
+8. Click on `Import data` and you're done!
+
 ## How it all started
 
 I was looking for a way to export my passwords from Synology C2 Password to Bitwarden. I found [this reddit post](https://www.reddit.com/r/synology/comments/1d21avn/export_c2_password_data/) which was pretty much my situation. Setup a Vaultwarden in Docker and wanted to transfer over. I only had login credentials in Synology C2 Password, no cards or notes. \
