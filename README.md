@@ -27,20 +27,21 @@ This is where Linux users and Windows part ways. Please follow the instructions 
     1.1 Run `sudo add-apt-repository ppa:deadsnakes/ppa` \
     1.2 Run `sudo apt update` \
     1.3 Run `sudo apt install python3.11` \
-    1.4 Run `nano ~/.bashrc` and add the following lines to the end of the file:
+    1.4 Run `sudo apt-get install python3-pip`\
+    1.5 Run `nano ~/.bashrc` and add the following lines to the end of the file:
     ```bash
     alias pip311="/usr/bin/python3.11 -m pip"
     alias py311="/usr/bin/python3.11"
     ```
-    1.5 Run `source ~/.bashrc`
-2. Clone this repository: \
+    1.6 Run `source ~/.bashrc`
+3. Clone this repository: \
     2.1 Run `git clone https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden.git` \
     2.2 Run `cd SynologyC2Password-to-Bitwarden`
-3. Install the required Python packages: \
+4. Install the required Python packages: \
     3.1 Run `pip311 install -r requirements.txt`
-4. Bring your Synology C2 Password export file to the same directory as the script: \
+5. Bring your Synology C2 Password export file to the same directory as the script: \
     4.1 Run `cp /path/to/your/exported/C2Password_Export_XXXXXXXX.csv ./c2_file.csv`
-5. Run the script: \
+6. Run the script: \
     5.1 Run `py311 syno2bw.py` and follow the instructions.
 
 Notes:
