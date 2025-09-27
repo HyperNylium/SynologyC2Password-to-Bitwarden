@@ -1,24 +1,24 @@
 ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###
+###
 ### Author/Creator: HyperNylium
 ### GitHub: https://github.com/HyperNylium/
-###
+### 
 ### Contributors:
-### - Jonas (https://github.com/Gamerhund/)
+###  - Jonas (https://github.com/Gamerhund/)
 ###
-### Version: 1.1.0
+### Version: 1.0.1
 ### LastEdit: 27/9/2024
 ###
 ### pyinstaller --onefile syno2bw.py
-###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+import os
+import sys
+import signal
+from pathlib import Path
 
 try:
     import pandas as pd
-    import sys
-    import signal
-    import os
-    from pathlib import Path
 except ImportError as importError:
     ModuleNotFound = str(importError).split("'")[1]
     print(f"An error occurred while importing dependency '{ModuleNotFound}'.\nPlease run 'pip install -r requirements.txt' to install the required dependency.")
