@@ -1,22 +1,17 @@
 ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-###
+
+###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###
 ### Author/Creator: HyperNylium
 ### GitHub: https://github.com/HyperNylium/
-### 
-### Contributor: Jonas (path handling improvements and error fixes)
-### 
+###
+### Contributors:
+### - Jonas (https://github.com/Gamerhund/)
+###
 ### Version: 1.1.0
 ### LastEdit: 27/9/2024
-### 
-### Improvements in v1.1.0:
-### - Fixed path handling issues with quotes on Windows
-### - Better error handling and user feedback
-### - Auto-detection of directory vs file paths
-### - Support for multiple text encodings
-### - More robust CSV parsing
-### 
+###
 ### pyinstaller --onefile syno2bw.py
-###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 try:
     import pandas as pd
