@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 
-def clean_path(path_input: str):
+def clean_path(path_input: str) -> str:
     """Clean and normalize the provided file path"""
     if not path_input:
         return None
@@ -23,11 +23,11 @@ def validate_input_file(file_path: str) -> bool:
     if not os.path.exists(file_path):
         print(f"Error: The file '{file_path}' was not found.")
         return False
-    
+
     if not os.path.isfile(file_path):
         print(f"Error: '{file_path}' is not a file.")
         return False
-    
+
     try:
         # Quick test to see if file is readable
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -113,20 +113,23 @@ try:
     for encoding in encodings_to_try:
         try:
             with open(c2_password_export_path, "r") as f:
-                # Try to detect dialect. fall back to default if detection fails
                 sample = f.read(4096)
                 f.seek(0)
+
                 try:
                     dialect = csv.Sniffer().sniff(sample)
                 except Exception:
                     dialect = csv.excel
+
                 reader = csv.DictReader(f, dialect=dialect)
                 detected_columns = reader.fieldnames or []
+
                 if not detected_columns:
                     raise ValueError("No columns detected")
                 rows = list(reader)
                 c2_password_data = rows
                 break
+
         except UnicodeDecodeError:
             continue
         except Exception as e:
@@ -245,7 +248,7 @@ try:
     print("3. Select 'Bitwarden (.csv)' as the file format")
     print("4. Upload the created file")
     print("\nImportant: Remember to securely delete the CSV files after importing!")
-    
+
 except Exception as e:
     print(f"An error occurred while saving the file: {e}")
     sys.exit()
