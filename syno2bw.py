@@ -4,7 +4,6 @@ import csv
 from datetime import datetime
 
 
-
 def clean_path(path_input: str) -> str:
     """Clean and normalize the provided file path"""
     if not path_input:
@@ -17,6 +16,7 @@ def clean_path(path_input: str) -> str:
     path_cleaned = path_cleaned.replace('\\', os.sep).replace('/', os.sep)
 
     return path_cleaned
+
 
 def validate_input_file(file_path: str) -> bool:
     """Validate the provided file path"""
@@ -37,6 +37,7 @@ def validate_input_file(file_path: str) -> bool:
         print(f"Error: Cannot read file '{file_path}': {e}")
         return False
 
+
 def is_value_present(value) -> bool:
     """Check if a value is present and not NaN-like"""
     if value is None:
@@ -55,9 +56,9 @@ print("""
     Please follow the instructions below to proceed.
 """)
 
-cwd = os.getcwd() # Get the current working directory to use as default path
+cwd = os.getcwd()  # Get the current working directory to use as default path
 today = datetime.today().strftime('%Y%m%d')
-default_c2_filename = f"C2Password_Export_{today}.csv" # Synology's default export filename format
+default_c2_filename = f"C2Password_Export_{today}.csv"  # Synology's default export filename format
 default_c2_filepath = os.path.join(cwd, default_c2_filename)
 default_bitwarden_filepath = os.path.join(cwd, "bitwarden_file.csv")
 bitwarden_fieldnames = ["folder", "favorite", "type", "name", "notes", "fields", "reprompt", "login_uri", "login_username", "login_password", "login_totp"]
@@ -73,7 +74,7 @@ while True:
         c2_password_export_path = clean_path(c2_password_export_path)
 
     print(f"Path to Synology C2 Password manager CSV file set to: {c2_password_export_path}\n")
-    
+
     # Validate the input file
     if validate_input_file(c2_password_export_path):
         break
@@ -112,7 +113,7 @@ try:
     last_error = None
     for encoding in encodings_to_try:
         try:
-            with open(c2_password_export_path, "r") as f:
+            with open(c2_password_export_path, "r", encoding=encoding, newline="") as f:
                 sample = f.read(4096)
                 f.seek(0)
 
@@ -176,7 +177,7 @@ for index, row in enumerate(c2_password_data):
 
         # Name
         name_value = row.get("Display_Name")
-        name = f"Entry_{index+1}"
+        name = f"Entry_{index + 1}"
         if is_value_present(name_value) and str(name_value).strip():
             name = str(name_value)
 
@@ -205,13 +206,13 @@ for index, row in enumerate(c2_password_data):
             login_totp = str(totp_value)
 
         processed_data.append({
-            "folder": "", # Leave folder empty for user to assign during import
+            "folder": "",  # Leave folder empty for user to assign during import
             "favorite": favorite,
-            "type": "login", # Assuming all entries are of type "login"
+            "type": "login",  # Assuming all entries are of type "login"
             "name": name,
             "notes": notes,
-            "fields": "", # Add custom fields manually in Bitwarden for better accuracy
-            "reprompt": 0, # Setting "Master password re-prompt" to "0" for all entries to turn off the option. User can change this later manually.
+            "fields": "",  # Add custom fields manually in Bitwarden for better accuracy
+            "reprompt": 0,  # Setting "Master password re-prompt" to "0" for all entries to turn off the option. User can change this later manually.
             "login_uri": login_uri,
             "login_username": login_username,
             "login_password": login_password,
@@ -220,7 +221,7 @@ for index, row in enumerate(c2_password_data):
 
     except Exception as e:
         processing_errors += 1
-        print(f"Warning: Error processing row {index+1}: {e}")
+        print(f"Warning: Error processing row {index + 1}: {e}")
 
 if not processed_data:
     print("Error: No data could be processed.")
