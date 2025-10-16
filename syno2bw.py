@@ -216,12 +216,12 @@ print(f"Successfully processed entries: {len(bitwarden_data)}")
 try:
     bitwarden_data.to_csv(bitwarden_output_path, index=False, encoding='utf-8')
     print(f"The Bitwarden import file has been saved to: {bitwarden_output_path}")
-    print(f"\nNext steps:")
-    print(f"1. Open your Bitwarden/Vaultwarden web interface")
-    print(f"2. Go to Tools > Import Data")
-    print(f"3. Select 'Bitwarden (.csv)' as the file format")
-    print(f"4. Upload the created file")
-    print(f"\nImportant: Remember to securely delete the CSV files after importing!")
+    print("\nNext steps:")
+    print("1. Open your Bitwarden/Vaultwarden web interface")
+    print("2. Go to Tools > Import Data")
+    print("3. Select 'Bitwarden (.csv)' as the file format")
+    print("4. Upload the created file")
+    print("\nImportant: Remember to securely delete the CSV files after importing!")
     
 except Exception as e:
     print(f"An error occurred while saving the file: {e}")
