@@ -1,0 +1,15 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+preview = true
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "B", "UP", "RUF"]
+ignore = ["E501", "UP015", "E712"]
+extend-select = ["TID252"]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "preserve"
+docstring-code-format = true
