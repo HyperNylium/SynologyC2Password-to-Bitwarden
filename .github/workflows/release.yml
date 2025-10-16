@@ -1,0 +1,48 @@
+name: Build .exe on Release
+run-name: "Build PyInstaller exe for ${{ github.event.release.name }}"
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-attach-exe:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build exe (onefile)
+        run: pyinstaller --onefile syno2bw.py
+
+      - name: Create SHA256SUMS.txt
+        shell: pwsh
+        run: |
+          $exe = "dist/syno2bw.exe"
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  syno2bw.exe" | Out-File -Encoding utf8 "dist/SHA256SUMS.txt"
+          Get-Content "dist/SHA256SUMS.txt"
+
+      - name: Upload exe and checksum to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            dist/syno2bw.exe
+            dist/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
