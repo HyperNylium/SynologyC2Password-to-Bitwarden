@@ -1,13 +1,7 @@
 import os
 import sys
+import csv
 from datetime import datetime
-
-try:
-    import pandas as pd
-except ImportError as importError:
-    ModuleNotFound = str(importError).split("'")[1]
-    print(f"An error occurred while importing dependency '{ModuleNotFound}'.\nPlease run 'pip install -r requirements.txt' to install the required dependency.")
-    sys.exit()
 
 
 
@@ -43,6 +37,16 @@ def validate_input_file(file_path: str) -> bool:
         print(f"Error: Cannot read file '{file_path}': {e}")
         return False
 
+def is_value_present(value) -> bool:
+    """Check if a value is present and not NaN-like"""
+    if value is None:
+        return False
+
+    # Handle NaN-like strings and blanks
+    text = str(value).strip()
+    return text.lower() not in ("", "nan", "none", "null")
+
+
 print("""
     Welcome to the Synology C2 Password Manager to Bitwarden CSV file formatter!
     This script will help you convert your Synology C2 Password Manager exported CSV file to a Bitwarden/Vaultwarden compatible CSV file.
@@ -56,6 +60,7 @@ today = datetime.today().strftime('%Y%m%d')
 default_c2_filename = f"C2Password_Export_{today}.csv" # Synology's default export filename format
 default_c2_filepath = os.path.join(cwd, default_c2_filename)
 default_bitwarden_filepath = os.path.join(cwd, "bitwarden_file.csv")
+bitwarden_fieldnames = ["folder", "favorite", "type", "name", "notes", "fields", "reprompt", "login_uri", "login_username", "login_password", "login_totp"]
 
 # Get the path to the Synology C2 password manager exported CSV file
 while True:
@@ -102,44 +107,59 @@ try:
     # Try different encodings to handle various export formats
     encodings_to_try = ["utf-8", "utf-16", "cp1252", "iso-8859-1"]
     c2_password_data = None
+    detected_columns = []
 
+    last_error = None
     for encoding in encodings_to_try:
         try:
-            c2_password_data = pd.read_csv(c2_password_export_path, encoding=encoding)
-            break
+            with open(c2_password_export_path, "r") as f:
+                # Try to detect dialect. fall back to default if detection fails
+                sample = f.read(4096)
+                f.seek(0)
+                try:
+                    dialect = csv.Sniffer().sniff(sample)
+                except Exception:
+                    dialect = csv.excel
+                reader = csv.DictReader(f, dialect=dialect)
+                detected_columns = reader.fieldnames or []
+                if not detected_columns:
+                    raise ValueError("No columns detected")
+                rows = list(reader)
+                c2_password_data = rows
+                break
         except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            last_error = e
             continue
 
     if c2_password_data is None:
-        print("Error: Could not read the file with any of the supported encodings.")
+        if isinstance(last_error, ValueError) and str(last_error).lower() == "no columns detected":
+            print(f"Error: The file at {c2_password_export_path} is empty.")
+        else:
+            print("Error: Could not read the file with any of the supported encodings.")
         sys.exit()
 
 except FileNotFoundError:
     print(f"Error: The file at {c2_password_export_path} was not found.")
-    sys.exit()
-except pd.errors.EmptyDataError:
-    print(f"Error: The file at {c2_password_export_path} is empty.")
-    sys.exit()
-except pd.errors.ParserError as e:
-    print(f"Error: The file at {c2_password_export_path} could not be parsed: {e}")
     sys.exit()
 except Exception as e:
     print(f"Unexpected error while reading the file: {e}")
     sys.exit()
 
 print(f"Number of entries found: {len(c2_password_data)}")
-print(f"Detected columns: {list(c2_password_data.columns)}")
+print(f"Detected columns: {list(detected_columns)}")
 
 # Initialize a list to store the processed data
 processed_data = []
 processing_errors = 0
 
-for index, row in c2_password_data.iterrows():
+for index, row in enumerate(c2_password_data):
     try:
         # URLs
         urls_raw = row.get("Login_URLs", "")
         login_uri = ""
-        if pd.notna(urls_raw):
+        if is_value_present(urls_raw):
             urls_text = str(urls_raw).strip()
             if urls_text.lower() not in ("", "nan", "none", "null"):
                 url_list = [url.strip() for url in urls_text.split("\n")]
@@ -148,37 +168,37 @@ for index, row in c2_password_data.iterrows():
         # Favorite
         fav_value = row.get("Favorite")
         favorite = ""
-        if pd.notna(fav_value):
+        if is_value_present(fav_value):
             favorite = str(fav_value)
 
         # Name
         name_value = row.get("Display_Name")
         name = f"Entry_{index+1}"
-        if pd.notna(name_value) and str(name_value).strip():
+        if is_value_present(name_value) and str(name_value).strip():
             name = str(name_value)
 
         # Notes
         notes_value = row.get("Notes")
         notes = ""
-        if pd.notna(notes_value):
+        if is_value_present(notes_value):
             notes = str(notes_value)
 
         # Username
         user_value = row.get("Login_Username")
         login_username = ""
-        if pd.notna(user_value):
+        if is_value_present(user_value):
             login_username = str(user_value)
 
         # Password
         pass_value = row.get("Login_Password")
         login_password = ""
-        if pd.notna(pass_value):
+        if is_value_present(pass_value):
             login_password = str(pass_value)
 
         # TOTP
         totp_value = row.get("Login_TOTP")
         login_totp = ""
-        if pd.notna(totp_value):
+        if is_value_present(totp_value):
             login_totp = str(totp_value)
 
         processed_data.append({
@@ -208,13 +228,16 @@ if processing_errors > 0:
     print("Continuing with successfully processed entries.")
 
 # Create a new DataFrame for Bitwarden format
-bitwarden_data = pd.DataFrame(processed_data)
+bitwarden_data = processed_data
 
 print(f"Successfully processed entries: {len(bitwarden_data)}")
 
 # Save the translated data to a new CSV file
 try:
-    bitwarden_data.to_csv(bitwarden_output_path, index=False, encoding='utf-8')
+    with open(bitwarden_output_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=bitwarden_fieldnames)
+        writer.writeheader()
+        writer.writerows(bitwarden_data)
     print(f"The Bitwarden import file has been saved to: {bitwarden_output_path}")
     print("\nNext steps:")
     print("1. Open your Bitwarden/Vaultwarden web interface")
