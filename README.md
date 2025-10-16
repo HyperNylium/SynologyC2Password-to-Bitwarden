@@ -39,8 +39,7 @@ This is where Linux users and Windows part ways. Please follow the instructions 
     2.2 Run `cd SynologyC2Password-to-Bitwarden`
 4. Install the required Python packages: \
     3.1 Run `pip311 install -r requirements.txt`
-5. Bring your Synology C2 Password export file to the same directory as the script: \
-    4.1 Run `cp /path/to/your/exported/C2Password_Export_XXXXXXXX.csv ./c2_file.csv`
+5. Bring your Synology C2 Password export file to the same directory as the script.
 6. Run the script: \
     5.1 Run `py311 syno2bw.py` and follow the instructions.
 
