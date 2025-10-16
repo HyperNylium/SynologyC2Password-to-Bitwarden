@@ -82,20 +82,7 @@ The Bitwarden CSV format has the following columns (in the order they appear):
 - `login_password`
 - `login_totp`
 
-First attempt - The translation would look a little something like this (from Syno C2 .csv to Bitwarden .csv format): 
-- `...` -> `folder` (you pick the folder, if any, while importing in WebUI)
-- `Favorite` -> `favorite`
-- `login` -> `type` (different types of entries like Cards, Identities, etc. In our case, "login" will do for usernames and passwords. Can find more [here](https://bitwarden.com/help/managing-items/))
-- `Display_Name` -> `name`
-- `Notes` -> `notes`
-- `...` -> `fields` (custom fields)
-- `0` -> `reprompt` this is only for the "Master password re-prompt" option in Bitwarden and does not exist in Syno C2, hence it is off when translating..
-- `Login_URLs` -> `login_uri`
-- `Login_Username` -> `login_username`
-- `Login_Password` -> `login_password`
-- `Login_TOTP` -> `login_totp`
-
-Final attempt - In the end, this is the map I came up with for `syno2bw.py`:
+from Syno C2 .csv to Bitwarden .csv format that this script uses:
 - `folder`: Left empty for the user to assign during import.
 - `favorite`: Mapped from `Favorite`, defaulting to an empty string if missing.
 - `type`: Set to `login` as we can't tell from exported Syno C2 what type of credential it is (no column header. Would need further testing).
