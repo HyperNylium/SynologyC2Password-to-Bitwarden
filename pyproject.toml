@@ -8,8 +8,3 @@ preview = true
 select = ["E", "W", "F", "B", "UP", "RUF"]
 ignore = ["E501", "UP015", "E712"]
 extend-select = ["TID252"]
-
-[tool.ruff.format]
-indent-style = "space"
-quote-style = "preserve"
-docstring-code-format = true
