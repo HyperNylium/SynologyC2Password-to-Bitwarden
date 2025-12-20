@@ -103,7 +103,7 @@ Now, let's talk about the things this script can't do.
 
 Things to know:
 1. I have only tested importing my re-formatted .csv file to Vaultwarden with the `Bitwarden (.csv)` format.
-2. I have done my testing with Python version 3.11.5 on Windows 11 and Python 3.11.9 on a Ubuntu 24.04 system.
+2. I have done my testing with Python version 3.11.5/3.13.11 on Windows 11 and Python 3.11.9 on a Ubuntu 24.04 system.
 3. After exporting your .csv file from Synology C2 Password please **DO NOT DELETE ANYTHING** from Synology C2 Password until you are %100 sure everything has Imported correctly into Bitwarden or Vaultwarden.
 4. Does not transfer "Match detection".
 5. I will see what I can do about the different types that come from Syno C2 Password (Payment Card, Identity, Bank Account, etc).
