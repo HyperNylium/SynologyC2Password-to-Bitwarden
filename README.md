@@ -22,31 +22,33 @@ This is where Linux users and Windows part ways. Please follow the instructions 
 2. Bring your Synology C2 Password export file to the same directory as the executable.
 3. Run the executable by double-clicking on it and follow the instructions.
 
-### Linux
-1. Let's install Python 3.11: \
+### Linux/Source
+1. Let's install Python 3.13: \
     1.1 Run `sudo add-apt-repository ppa:deadsnakes/ppa` \
     1.2 Run `sudo apt update` \
-    1.3 Run `sudo apt install python3.11` \
+    1.3 Run `sudo apt install python3.13` \
     1.4 Run `sudo apt-get install python3-pip`\
     1.5 Run `nano ~/.bashrc` and add the following lines to the end of the file:
     ```bash
-    alias pip311="/usr/bin/python3.11 -m pip"
-    alias py311="/usr/bin/python3.11"
+    alias pip313="/usr/bin/python3.13 -m pip"
+    alias py313="/usr/bin/python3.13"
     ```
     1.6 Run `source ~/.bashrc`
 3. Clone this repository: \
     2.1 Run `git clone https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden.git` \
     2.2 Run `cd SynologyC2Password-to-Bitwarden`
 4. Install the required Python packages: \
-    3.1 Run `pip311 install -r requirements.txt`
+    3.1 Run `pip313 install -r requirements.txt`
 5. Bring your Synology C2 Password export file to the same directory as the script.
 6. Run the script: \
-    5.1 Run `py311 syno2bw.py` and follow the instructions.
+    5.1 Run `py313 syno2bw.py` and follow the instructions.
 
 Notes:
 - The script will create a new file called `bitwarden_file.csv` in the directory you choose to save it. Make sure the user executing the script has write permissions in that directory.
-- To access the Pythin 3.11 interpreter, you can run `py311` in the terminal and you can run `pip311` to access the Python 3.11 pip package manager.
+- To access the Pythin 3.11 interpreter, you can run `py313` in the terminal and you can run `pip313` to access the Python 3.11 pip package manager.
 - I may or may not make a bash script later in the future for Linux users just so it's more easier to use. But for now, this will do.
+- Even though i mention installing Python 3.13, this script should work with Python 3.11 and above (incliding 3.12, 3.13, 3.14, etc). Just be aware that i didnt test it on every version, so issues may arise. \
+  If you do find any issues, please open an issue :)
 
 
 ## Import to Bitwarden/Vaultwarden
