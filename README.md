@@ -45,7 +45,7 @@ This is where Linux users and Windows part ways. Please follow the instructions 
 
 Notes:
 - The script will create a new file called `bitwarden_file.csv` in the directory you choose to save it. Make sure the user executing the script has write permissions in that directory.
-- To access the Pythin 3.11 interpreter, you can run `py313` in the terminal and you can run `pip313` to access the Python 3.11 pip package manager.
+- To access the Pythin 3.13 interpreter, you can run `py313` in the terminal and you can run `pip313` to access the Python 3.13 pip package manager.
 - I may or may not make a bash script later in the future for Linux users just so it's more easier to use. But for now, this will do.
 - Even though i mention installing Python 3.13, this script should work with Python 3.11 and above. Just be aware that i didnt test it on every version, only 3.11 and 3.13, so issues may arise on different versions. \
   If you do find any issues, please open an issue :)
