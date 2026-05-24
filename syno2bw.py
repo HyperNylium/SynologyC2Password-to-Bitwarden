@@ -114,13 +114,9 @@ try:
     for encoding in encodings_to_try:
         try:
             with open(c2_password_export_path, "r", encoding=encoding, newline="") as f:
-                sample = f.read(4096)
-                f.seek(0)
-
-                try:
-                    dialect = csv.Sniffer().sniff(sample)
-                except Exception:
-                    dialect = csv.excel
+                # Synology C2 always exports comma separated, so use the comma dialect directly.
+                # Auto detecting the delimiter could wrongly pick ":" on vaults full of URLs and blank out every field. (issue #4)
+                dialect = csv.excel
 
                 reader = csv.DictReader(f, dialect=dialect)
                 detected_columns = reader.fieldnames or []
@@ -230,6 +226,18 @@ if not processed_data:
 if processing_errors > 0:
     print(f"Encountered {processing_errors} errors while processing data.")
     print("Continuing with successfully processed entries.")
+
+# Count entries that actually have login data.
+# If every entry is blank the file was read wrong, so stop here instead of saving a useless empty file.
+entries_with_data = 0
+for entry in processed_data:
+    if entry["login_username"] or entry["login_password"] or entry["login_uri"]:
+        entries_with_data += 1
+
+if entries_with_data == 0:
+    print("Error: entries were found, but none of them had a username, password, or URL.")
+    print("The file may be in an unexpected format. Aborting so an empty file is not created.")
+    sys.exit()
 
 # Create a new DataFrame for Bitwarden format
 bitwarden_data = processed_data
