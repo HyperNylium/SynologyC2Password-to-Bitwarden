@@ -20,33 +20,30 @@ This is where Linux users and Windows part ways. Please follow the instructions 
 1. Download the latest version of `syno2bw.exe` from the [releases page](https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden/releases) \
     1.1 Please do note that you will get a warning from Windows Defender SmartScreen. This is because I am not a verified publisher. You can safely ignore this warning by clicking on `More info` and then `Run anyway`.
 2. Bring your Synology C2 Password export file to the same directory as the executable.
-3. Run the executable by double-clicking on it and follow the instructions.
+3. Open a terminal in that directory and run the executable: \
+    3.1 In File Explorer, navigate to the folder containing `syno2bw.exe`, type `cmd` in the address bar, and press Enter to open a Command Prompt there (or use PowerShell). \
+    3.2 Run `syno2bw.exe` and follow the instructions.
 
 ### Linux/Source
 1. Let's install Python 3.13: \
     1.1 Run `sudo add-apt-repository ppa:deadsnakes/ppa` \
     1.2 Run `sudo apt update` \
     1.3 Run `sudo apt install python3.13` \
-    1.4 Run `sudo apt-get install python3-pip`\
-    1.5 Run `nano ~/.bashrc` and add the following lines to the end of the file:
+    1.4 Run `nano ~/.bashrc` and add the following line to the end of the file:
     ```bash
-    alias pip313="/usr/bin/python3.13 -m pip"
     alias py313="/usr/bin/python3.13"
     ```
-    1.6 Run `source ~/.bashrc`
-3. Clone this repository: \
+    1.5 Run `source ~/.bashrc`
+2. Clone this repository: \
     2.1 Run `git clone https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden.git` \
     2.2 Run `cd SynologyC2Password-to-Bitwarden`
-4. Install the required Python packages: \
-    3.1 Run `pip313 install -r requirements.txt`
-5. Bring your Synology C2 Password export file to the same directory as the script.
-6. Run the script: \
-    5.1 Run `py313 syno2bw.py` and follow the instructions.
+3. Bring your Synology C2 Password export file to the same directory as the script.
+4. Run the script: \
+    4.1 Run `py313 syno2bw.py` and follow the instructions.
 
 Notes:
 - The script will create a new file called `bitwarden_file.csv` in the directory you choose to save it. Make sure the user executing the script has write permissions in that directory.
-- To access the Pythin 3.13 interpreter, you can run `py313` in the terminal and you can run `pip313` to access the Python 3.13 pip package manager.
-- I may or may not make a bash script later in the future for Linux users just so it's more easier to use. But for now, this will do.
+- To access the Python 3.13 interpreter, you can run `py313` in the terminal.
 - Even though i mention installing Python 3.13, this script should work with Python 3.11 and above. Just be aware that i didnt test it on every version, only 3.11 and 3.13, so issues may arise on different versions. \
   If you do find any issues, please open an issue :)
 
