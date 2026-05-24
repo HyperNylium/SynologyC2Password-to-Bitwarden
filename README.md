@@ -1,109 +1,98 @@
 # SynologyC2Password to Bitwarden formatter/translater
 
 ## Description
-This script will convert/translate the Synology C2 Password export (.csv) file to a Bitwarden/Vaultwarden (.csv) importable format.
+Converts a Synology C2 Password export (`.csv`) into a Bitwarden/Vaultwarden importable `.csv`.
 
 ## Getting Started
-We first need to export those juicy passwords from Synology C2 Password. So, lets do that!
-1. Export your Synology C2 Passwords by following the steps below: \
-    1.1. Open the Synology C2 Passwords web interface. \
-    1.2. Click on your profile picture icon in the top right corner. \
-    1.3. Click on `Export`. \
-    1.4. Click on `Download`. \
-    1.5. Save the file to your computer. \
-![export-from-syno-step1](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden/main/imgs/export-from-syno-step1.png)
-![export-from-syno-step2](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden/main/imgs/export-from-syno-step2.png)
+First, let's export those juicy passwords from Synology C2 Password:
+1. Open the Synology C2 Passwords web interface.
+2. Click your profile icon (top right), then `Export`, then `Download`.
+3. Save the file to your computer.
 
-This is where Linux users and Windows part ways. Please follow the instructions for your operating system.
+![export-from-syno-step1](imgs/export-from-syno-step1.png)
+![export-from-syno-step2](imgs/export-from-syno-step2.png)
+
+Now follow the steps for your OS.
 
 ### Windows
-1. Download the latest version of `syno2bw.exe` from the [releases page](https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden/releases) \
-    1.1 Please do note that you will get a warning from Windows Defender SmartScreen. This is because I am not a verified publisher. You can safely ignore this warning by clicking on `More info` and then `Run anyway`.
-2. Bring your Synology C2 Password export file to the same directory as the executable.
-3. Open a terminal in that directory and run the executable: \
-    3.1 In File Explorer, navigate to the folder containing `syno2bw.exe`, type `cmd` in the address bar, and press Enter to open a Command Prompt there (or use PowerShell). \
-    3.2 Run `syno2bw.exe` and follow the instructions.
+1. Download the latest `syno2bw.exe` from the [releases page](https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden/releases).
+    - Windows Defender SmartScreen may warn you because I'm not a verified publisher. Click `More info` then `Run anyway`.
+2. Put `syno2bw.exe` in the **same folder** as your exported Synology C2 `.csv` file.
+3. **Double-click `syno2bw.exe`.** That's it.
+    - It finds your export, asks you to confirm, converts it, and saves `bitwarden_file.csv` in the same folder.
+    - The window stays open so you can read the results (and any skipped entries). Press Enter to close it.
+
+**Tip:** You can also drag your exported `.csv` straight onto `syno2bw.exe` to convert it.
+
+<details>
+<summary>Advanced: run from a terminal</summary>
+
+In File Explorer, type `cmd` in the folder's address bar and press Enter, then run `syno2bw.exe`.  
+You can also pass the export directly: `syno2bw.exe "C:\path\to\C2Password_Export.csv"`.
+</details>
 
 ### Linux/Source
-1. Let's install Python 3.13: \
-    1.1 Run `sudo add-apt-repository ppa:deadsnakes/ppa` \
-    1.2 Run `sudo apt update` \
-    1.3 Run `sudo apt install python3.13` \
-    1.4 Run `nano ~/.bashrc` and add the following line to the end of the file:
-    ```bash
-    alias py313="/usr/bin/python3.13"
-    ```
-    1.5 Run `source ~/.bashrc`
-2. Clone this repository: \
-    2.1 Run `git clone https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden.git` \
-    2.2 Run `cd SynologyC2Password-to-Bitwarden`
-3. Bring your Synology C2 Password export file to the same directory as the script.
-4. Run the script: \
-    4.1 Run `py313 syno2bw.py` and follow the instructions.
+1. Install Python 3.13 (3.11, 3.12, 3.13 and 3.14 works too):
+   ```bash
+   sudo apt update && sudo apt install software-properties-common
+   sudo add-apt-repository ppa:deadsnakes/ppa
+   sudo apt update
+   sudo apt install python3.13
+   ```
+2. Clone and enter the repo:
+   ```bash
+   git clone https://github.com/HyperNylium/SynologyC2Password-to-Bitwarden.git
+   cd SynologyC2Password-to-Bitwarden
+   ```
+3. Put your C2 export `.csv` in the same folder, then run `python3.13 syno2bw.py` and follow the prompts.
 
 Notes:
-- The script will create a new file called `bitwarden_file.csv` in the directory you choose to save it. Make sure the user executing the script has write permissions in that directory.
-- To access the Python 3.13 interpreter, you can run `py313` in the terminal.
-- Even though i mention installing Python 3.13, this script should work with Python 3.11 and above. Just be aware that i didnt test it on every version, only 3.11 and 3.13, so issues may arise on different versions. \
-  If you do find any issues, please open an issue :)
-
+- The script writes `bitwarden_file.csv` next to your export, so make sure you have write permission in that folder.
+- Tested on Python 3.11 and 3.13, but it should work on 3.11+. If you hit an issue, please open one :)
 
 ## Import to Bitwarden/Vaultwarden
 1. Open your Bitwarden/Vaultwarden web interface.
-2. Click on the `Tools` tab at the top. \
-![export-from-syno-step2](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden/main/imgs/import-into-bitwarden1.png)
-3. Click on `Import Data` from the `Tools` box on the left. \
-![export-from-syno-step2](https://raw.githubusercontent.com/HyperNylium/SynologyC2Password-to-Bitwarden/main/imgs/import-into-bitwarden2.png)
-4. Set `import destination` to `My vault` or where ever you want to import the passwords to.
-5. Set `Folder` to `-- Select Folder --` or where ever you want to import the passwords to.
-6. Set `File format` to `Bitwarden (.csv)`.
-7. Click on `Choose file` and select the `bitwarden_file.csv` file that was created by the script/executable.
-8. Click on `Import data` and you're done!
+2. Click the `Tools` on the left side, then `Import`.
+
+![import-into-bitwarden](imgs/import-into-bitwarden.png)
+
+3. Under the "Destination" section, you can choose what vault or folder to import into.
+4. Under the "Data" section, make sure the "File format" dropdown is set to `Bitwarden (csv)`.  
+    This is important for the import to work correctly.
+5. Click `Choose file`, pick the `bitwarden_file.csv` the script made, then click `Import data`. Done!
+
+![import-into-bitwarden-wizard](imgs/import-into-bitwarden-wizard.png)
 
 ## How it all started
+I wanted to move my passwords from Synology C2 Password to a Vaultwarden instance I set up in Docker. I found [this reddit post](https://www.reddit.com/r/synology/comments/1d21avn/export_c2_password_data/) in the same situation. I only had logins, no cards or notes. Using [this Bitwarden help article](https://bitwarden.com/help/condition-bitwarden-import/) (see the ".csv for individual vault" part), I mapped the C2 fields to the Bitwarden ones.
 
-I was looking for a way to export my passwords from Synology C2 Password to Bitwarden. I found [this reddit post](https://www.reddit.com/r/synology/comments/1d21avn/export_c2_password_data/) which was pretty much my situation. Setup a Vaultwarden in Docker and wanted to transfer over. I only had login credentials in Synology C2 Password, no cards or notes. \
-Heres my comment with my research and translation map I created: \
+### Field mapping (Syno C2 -> Bitwarden)
+| Bitwarden field | From Synology C2 |
+|---|---|
+| `folder` | left empty, assign during import |
+| `favorite` | `Favorite` (empty if missing) |
+| `type` | always `login` (the C2 export doesn't say the type) |
+| `name` | `Display_Name` |
+| `notes` | `Notes` |
+| `fields` | left empty, add custom fields by hand after import |
+| `reprompt` | `0` ("Master password re-prompt" off, not in C2. `0 = off`, `1 = on`) |
+| `login_uri` | `Login_URLs` (joined together) |
+| `login_username` | `Login_Username` |
+| `login_password` | `Login_Password` |
+| `login_totp` | `Login_TOTP` |
 
-From [this Bitwarden help article](https://bitwarden.com/help/condition-bitwarden-import/) (area under ".csv for individual vault") I was able to find the Bitwarden headers they use and kind of map out what goes to what.
+### Limitations
+- Only converts Synology C2 Password (`.csv`) to Bitwarden (`.csv`). No bitwarden `.json` format.
+- Every entry becomes a `login`. Other categories (Payment Card, Identity, Bank Account, etc) are not transferred.  
+    The script lists anything it skips so nothing disappears silently.
+- Custom fields are not mapped. Add them manually after importing.
+- "Match detection" is not transferred.
 
-The Bitwarden CSV format has the following columns (in the order they appear):
-- `folder`
-- `favorite`
-- `type`
-- `name`
-- `notes`
-- `fields`
-- `reprompt`
-- `login_uri`
-- `login_username`
-- `login_password`
-- `login_totp`
+### Good to know
+- Tested importing into Vaultwarden with the `Bitwarden (.csv)` format, on Python 3.11.5/3.13.11 (Windows 11) and 3.11.9 (Ubuntu 24.04).
+- **DO NOT DELETE ANYTHING** from Synology C2 Password until you are 100% sure everything imported correctly.
+- I'll look into supporting "Payment card" and "Secure note"in the future.
 
-from Syno C2 .csv to Bitwarden .csv format that this script uses:
-- `folder`: Left empty for the user to assign during import.
-- `favorite`: Mapped from `Favorite`, defaulting to an empty string if missing.
-- `type`: Set to `login` as we can't tell from exported Syno C2 what type of credential it is (no column header. Would need further testing).
-- `name`: Mapped from `Display_Name`.
-- `notes`: Mapped from `Notes`.
-- `fields`: Left empty. Cannot accurately translate these to Bitwarden format. Will have to enter manually upon import.
-- `reprompt`: Set to `0` (this is only for the "Master password re-prompt" option in Bitwarden and does not exist in Syno C2 Password, hence it is off when translating. `0 = off | 1 = on`).
-- `login_uri`: Concatenated URLs from `Login_URLs`.
-- `login_username`: Mapped from `Login_Username`.
-- `login_password`: Mapped from `Login_Password`.
-- `login_totp`: Mapped from `Login_TOTP`.
+Feedback and suggestions are welcome! I'm not a professional programmer, so please be gentle. I'm learning as I go.
 
-Now, let's talk about the things this script can't do. 
-1. This translation only works for "from Synology C2 Password (.csv) -> Bitwarden (.csv)". 
-2. The "type" is always assumed to be "login". That means if you have your card saved in Syno C2 Password, that will not be imported/translated and will probably give an error/crash. This only works for entries with a type of "login". When you log into Synology C2 Password, on the left-hand side there is a section called "Category". This script will only translate the items in the "Login" section. 
-3. This script cannot import custom fields for accuracy's sake. You will have to manually add them into Bitwarden or Vaultwarden yourself. Could add this feature in the future if requested.
-
-Things to know:
-1. I have only tested importing my re-formatted .csv file to Vaultwarden with the `Bitwarden (.csv)` format.
-2. I have done my testing with Python version 3.11.5/3.13.11 on Windows 11 and Python 3.11.9 on a Ubuntu 24.04 system.
-3. After exporting your .csv file from Synology C2 Password please **DO NOT DELETE ANYTHING** from Synology C2 Password until you are %100 sure everything has Imported correctly into Bitwarden or Vaultwarden.
-4. Does not transfer "Match detection".
-5. I will see what I can do about the different types that come from Syno C2 Password (Payment Card, Identity, Bank Account, etc).
-
-
-For those who want to test this out, please do give feedback! I am open to suggestions and improvements. I am not a professional programmer, so please be gentle. I am learning as I go. I hope this helps someone out there :)
+I hope this helps someone out there :)
