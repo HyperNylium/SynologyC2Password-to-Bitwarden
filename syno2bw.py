@@ -1,25 +1,29 @@
 import os
 import sys
 import csv
-from datetime import datetime
+import glob
 
 
-def clean_path(path_input: str) -> str:
-    """Clean and normalize the provided file path"""
+BITWARDEN_FIELDS = [
+    "folder", "favorite", "type", "name", "notes", "fields",
+    "reprompt", "login_uri", "login_username", "login_password", "login_totp",
+]
+
+
+def clean_path(path_input: str):
+    """Clean up a path the user typed or pasted."""
     if not path_input:
         return None
 
-    # Remove surrounding quotes
+    # drop surrounding quotes and make the slashes match this os
     path_cleaned = path_input.strip().strip('"').strip("'")
-
-    # Handle Windows paths with backslashes
-    path_cleaned = path_cleaned.replace('\\', os.sep).replace('/', os.sep)
+    path_cleaned = path_cleaned.replace("\\", os.sep).replace("/", os.sep)
 
     return path_cleaned
 
 
-def validate_input_file(file_path: str) -> bool:
-    """Validate the provided file path"""
+def validate_input_file(file_path: str):
+    """Check the path exists and can be read."""
     if not os.path.exists(file_path):
         print(f"Error: The file '{file_path}' was not found.")
         return False
@@ -28,9 +32,10 @@ def validate_input_file(file_path: str) -> bool:
         print(f"Error: '{file_path}' is not a file.")
         return False
 
+    # open in binary just to check we can read it.
+    # the real encoding is figured out later in read_csv so dont force utf-8 here.
     try:
-        # Quick test to see if file is readable
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "rb") as f:
             f.read(1)
         return True
     except Exception as e:
@@ -38,226 +43,316 @@ def validate_input_file(file_path: str) -> bool:
         return False
 
 
-def is_value_present(value) -> bool:
-    """Check if a value is present and not NaN-like"""
+def is_value_present(value: str | None):
+    """True if the value has real content."""
     if value is None:
         return False
 
-    # Handle NaN-like strings and blanks
     text = str(value).strip()
     return text.lower() not in ("", "nan", "none", "null")
 
 
-print("""
-    Welcome to the Synology C2 Password Manager to Bitwarden CSV file formatter!
-    This script will help you convert your Synology C2 Password Manager exported CSV file to a Bitwarden/Vaultwarden compatible CSV file.
+def field(value: str | None):
+    """Return the value as text or empty string if blank."""
+    return str(value) if is_value_present(value) else ""
 
-    Please do remember that if you want to exit the script at any time, you can press 'Ctrl + C' to stop the execution/exit the program at any time :)
-    Please follow the instructions below to proceed.
-""")
 
-cwd = os.getcwd()  # Get the current working directory to use as default path
-today = datetime.today().strftime('%Y%m%d')
-default_c2_filename = f"C2Password_Export_{today}.csv"  # Synology's default export filename format
-default_c2_filepath = os.path.join(cwd, default_c2_filename)
-default_bitwarden_filepath = os.path.join(cwd, "bitwarden_file.csv")
-bitwarden_fieldnames = ["folder", "favorite", "type", "name", "notes", "fields", "reprompt", "login_uri", "login_username", "login_password", "login_totp"]
+def join_urls(raw: str | None):
+    """Join the C2 URL lines into one comma separated cell."""
+    if not is_value_present(raw):
+        return ""
 
-# Get the path to the Synology C2 password manager exported CSV file
-while True:
-    c2_password_export_path = input(f"Enter the path to your exported Synology C2 Password Manager CSV file\n(default value if blank: {default_c2_filepath})\n--> ").strip()
+    # synology puts each url on its own line but bitwarden wants them in one cell split by commas
+    urls = []
+    for part in str(raw).strip().split("\n"):
+        urls.append(part.strip())
 
-    # Set the default path if the user does not provide one (blank input)
-    if not c2_password_export_path:
-        c2_password_export_path = default_c2_filepath
-    else:
-        c2_password_export_path = clean_path(c2_password_export_path)
+    return ",".join(urls)
 
-    print(f"Path to Synology C2 Password manager CSV file set to: {c2_password_export_path}\n")
 
-    # Validate the input file
-    if validate_input_file(c2_password_export_path):
-        break
-    else:
-        print("Please try again with a valid file path.\n")
+def convert(rows: list[dict]):
+    """Turn Synology C2 rows into Bitwarden rows. Returns (converted, skipped)."""
+    converted = []
+    skipped = []
 
-# Get the path to save the Bitwarden/Vaultwarden compatible CSV file
-bitwarden_output_path = input(f"Enter where you would like to save the Bitwarden compatible CSV file\n(default value if blank: {default_bitwarden_filepath})\n--> ").strip()
+    for index, row in enumerate(rows):
+        row_number = index + 1
 
-# Set the default path if the user does not provide one (blank input)
-if not bitwarden_output_path:
-    bitwarden_output_path = default_bitwarden_filepath
-else:
-    bitwarden_output_path = clean_path(bitwarden_output_path)
-
-    # Checks to see if the provided path is a directory or a path without a file extension and appends a default filename to said path if so
-    if os.path.isdir(bitwarden_output_path) or (not os.path.splitext(bitwarden_output_path)[1] and not os.path.exists(bitwarden_output_path)):
-        bitwarden_output_path = os.path.join(bitwarden_output_path, "bitwarden_file.csv")
-        print("Directory detected. Adding default filename automatically.")
-
-# Output the path to the Bitwarden/Vaultwarden compatible CSV file
-print(f"Bitwarden compatible CSV file save path set to: {bitwarden_output_path}\n")
-
-# Ensure the output directory exists
-os.makedirs(os.path.dirname(bitwarden_output_path), exist_ok=True)
-
-# Load the Synology C2 password manager exported CSV file
-try:
-    print(f"Loading Synology C2 data from: {c2_password_export_path}")
-
-    # Try different encodings to handle various export formats
-    encodings_to_try = ["utf-8", "utf-16", "cp1252", "iso-8859-1"]
-    c2_password_data = None
-    detected_columns = []
-
-    last_error = None
-    for encoding in encodings_to_try:
         try:
-            with open(c2_password_export_path, "r", encoding=encoding, newline="") as f:
-                # Synology C2 always exports comma separated, so use the comma dialect directly.
-                # Auto detecting the delimiter could wrongly pick ":" on vaults full of URLs and blank out every field. (issue #4)
-                dialect = csv.excel
+            login_uri = join_urls(row.get("Login_URLs", ""))
+            username = field(row.get("Login_Username"))
+            password = field(row.get("Login_Password"))
+            display = field(row.get("Display_Name")).strip()
 
-                reader = csv.DictReader(f, dialect=dialect)
-                detected_columns = reader.fieldnames or []
+            # skip rows with no login data.
+            # these are usually cards or other non-login items that cant become a bitwarden login.
+            if not (username or password or login_uri):
+                skipped.append((display or f"(unnamed row {row_number})", "no login info"))
+                continue
 
-                if not detected_columns:
-                    raise ValueError("No columns detected")
-                rows = list(reader)
-                c2_password_data = rows
-                break
+            converted.append({
+                "folder": "",  # leave folder empty for user to assign during import
+                "favorite": field(row.get("Favorite")),
+                "type": "login",  # assuming all entries are of type "login"
+                "name": display or f"Entry_{row_number}",
+                "notes": field(row.get("Notes")),
+                "fields": "",  # add custom fields manually in Bitwarden for better accuracy
+                "reprompt": 0,  # setting "Master password re-prompt" to "0" for all entries to turn off the option. User can change this later manually.
+                "login_uri": login_uri,
+                "login_username": username,
+                "login_password": password,
+                "login_totp": field(row.get("Login_TOTP")),
+            })
+
+        except Exception:
+            # if one row blows up, skip it instead of crashing the whole run
+            display = ""
+            if isinstance(row, dict):
+                display = field(row.get("Display_Name")).strip()
+            skipped.append((display or f"(unnamed row {row_number})", "error reading row"))
+
+    return converted, skipped
+
+
+def read_csv(path: str):
+    """Read a C2 export CSV, trying a few encodings. Returns (rows, columns)."""
+    encodings = ["utf-8", "utf-16", "cp1252", "iso-8859-1"]
+    last_error = None
+
+    for encoding in encodings:
+        try:
+            with open(path, "r", encoding=encoding, newline="") as f:
+                # synology C2 password always exports comma separated, so use the comma dialect directly.
+                # auto detecting the delimiter could wrongly pick ":" on vaults full of URLs and blank out every field. (issue #4)
+                reader = csv.DictReader(f, dialect=csv.excel)
+                columns = reader.fieldnames or []
+
+                if not columns:
+                    raise ValueError("empty")
+
+                return list(reader), columns
 
         except UnicodeDecodeError:
+            # wrong encoding for this file, so try the next one
             continue
+
+        except ValueError as e:
+            # only the real "empty file" case should stop us.
+            # a no BOM utf-16 read also raises a ValueError so let that fall through and retry.
+            if str(e) == "empty":
+                raise
+            last_error = e
+            continue
+
         except Exception as e:
             last_error = e
             continue
 
-    if c2_password_data is None:
-        if isinstance(last_error, ValueError) and str(last_error).lower() == "no columns detected":
-            print(f"Error: The file at {c2_password_export_path} is empty.")
-        else:
-            print("Error: Could not read the file with any of the supported encodings.")
-        sys.exit()
+    raise ValueError("encoding") from last_error
 
-except FileNotFoundError:
-    print(f"Error: The file at {c2_password_export_path} was not found.")
-    sys.exit()
-except Exception as e:
-    print(f"Unexpected error while reading the file: {e}")
-    sys.exit()
 
-print(f"Number of entries found: {len(c2_password_data)}")
-print(f"Detected columns: {list(detected_columns)}")
+def save(rows: list[dict], path: str):
+    """Write rows to a CSV without overwriting an existing file."""
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
 
-# Initialize a list to store the processed data
-processed_data = []
-processing_errors = 0
+    # if the name is taken add "_2", "_3", etc before the extension
+    base, extension = os.path.splitext(path)
+    target = path
+    counter = 2
+    while os.path.exists(target):
+        target = f"{base}_{counter}{extension}"
+        counter += 1
 
-for index, row in enumerate(c2_password_data):
-    try:
-        # URLs
-        urls_raw = row.get("Login_URLs", "")
-        login_uri = ""
-        if is_value_present(urls_raw):
-            urls_text = str(urls_raw).strip()
-            if urls_text.lower() not in ("", "nan", "none", "null"):
-                url_list = [url.strip() for url in urls_text.split("\n")]
-                login_uri = ",".join(url_list)
-
-        # Favorite
-        fav_value = row.get("Favorite")
-        favorite = ""
-        if is_value_present(fav_value):
-            favorite = str(fav_value)
-
-        # Name
-        name_value = row.get("Display_Name")
-        name = f"Entry_{index + 1}"
-        if is_value_present(name_value) and str(name_value).strip():
-            name = str(name_value)
-
-        # Notes
-        notes_value = row.get("Notes")
-        notes = ""
-        if is_value_present(notes_value):
-            notes = str(notes_value)
-
-        # Username
-        user_value = row.get("Login_Username")
-        login_username = ""
-        if is_value_present(user_value):
-            login_username = str(user_value)
-
-        # Password
-        pass_value = row.get("Login_Password")
-        login_password = ""
-        if is_value_present(pass_value):
-            login_password = str(pass_value)
-
-        # TOTP
-        totp_value = row.get("Login_TOTP")
-        login_totp = ""
-        if is_value_present(totp_value):
-            login_totp = str(totp_value)
-
-        processed_data.append({
-            "folder": "",  # Leave folder empty for user to assign during import
-            "favorite": favorite,
-            "type": "login",  # Assuming all entries are of type "login"
-            "name": name,
-            "notes": notes,
-            "fields": "",  # Add custom fields manually in Bitwarden for better accuracy
-            "reprompt": 0,  # Setting "Master password re-prompt" to "0" for all entries to turn off the option. User can change this later manually.
-            "login_uri": login_uri,
-            "login_username": login_username,
-            "login_password": login_password,
-            "login_totp": login_totp,
-        })
-
-    except Exception as e:
-        processing_errors += 1
-        print(f"Warning: Error processing row {index + 1}: {e}")
-
-if not processed_data:
-    print("Error: No data could be processed.")
-    sys.exit()
-
-if processing_errors > 0:
-    print(f"Encountered {processing_errors} errors while processing data.")
-    print("Continuing with successfully processed entries.")
-
-# Count entries that actually have login data.
-# If every entry is blank the file was read wrong, so stop here instead of saving a useless empty file.
-entries_with_data = 0
-for entry in processed_data:
-    if entry["login_username"] or entry["login_password"] or entry["login_uri"]:
-        entries_with_data += 1
-
-if entries_with_data == 0:
-    print("Error: entries were found, but none of them had a username, password, or URL.")
-    print("The file may be in an unexpected format. Aborting so an empty file is not created.")
-    sys.exit()
-
-# Create a new DataFrame for Bitwarden format
-bitwarden_data = processed_data
-
-print(f"Successfully processed entries: {len(bitwarden_data)}")
-
-# Save the translated data to a new CSV file
-try:
-    with open(bitwarden_output_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=bitwarden_fieldnames)
+    with open(target, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=BITWARDEN_FIELDS)
         writer.writeheader()
-        writer.writerows(bitwarden_data)
-    print(f"The Bitwarden import file has been saved to: {bitwarden_output_path}")
-    print("\nNext steps:")
-    print("1. Open your Bitwarden/Vaultwarden web interface")
-    print("2. Go to Tools > Import Data")
-    print("3. Select 'Bitwarden (.csv)' as the file format")
-    print("4. Upload the created file")
-    print("\nImportant: Remember to securely delete the CSV files after importing!")
+        writer.writerows(rows)
 
-except Exception as e:
-    print(f"An error occurred while saving the file: {e}")
-    sys.exit()
+    return target
+
+
+def base_dir():
+    """Folder the program runs from."""
+    # when packaged as an exe look next to the exe instead of this file
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def find_export(folder: str):
+    """Find possible C2 export files in a folder."""
+    if not os.path.isdir(folder):
+        return []
+
+    # glob.escape keeps any [ ] * ? in the folder name from being treated as a search pattern
+    safe_folder = glob.escape(folder)
+
+    # first try synology's normal export name
+    matches = sorted(glob.glob(os.path.join(safe_folder, "C2Password_Export_*.csv")))
+    if matches:
+        return matches
+
+    # otherwise fall back to any other csv
+    other_csvs = []
+    for csv_path in sorted(glob.glob(os.path.join(safe_folder, "*.csv"))):
+        filename = os.path.basename(csv_path)
+        if not filename.lower().startswith("bitwarden_file"):
+            other_csvs.append(csv_path)
+
+    return other_csvs
+
+
+def finish(code: int = 0):
+    """Pause so the output stays on screen, then exit."""
+    try:
+        input("\nPress Enter to close...")
+    except EOFError:
+        pass
+
+    sys.exit(code)
+
+
+def choose_input():
+    """Find the export file or ask the user for it."""
+    # look in the folder the program runs from and the current folder
+    folders = []
+    seen_folders = set()
+    for folder in (base_dir(), os.getcwd()):
+        folder_key = os.path.normcase(os.path.abspath(folder))
+        if folder_key not in seen_folders:
+            seen_folders.add(folder_key)
+            folders.append(folder)
+
+    # collect every export file we can find in those folders
+    candidates = []
+    seen_files = set()
+    for folder in folders:
+        for found_path in find_export(folder):
+            file_key = os.path.normcase(os.path.abspath(found_path))
+            if file_key not in seen_files:
+                seen_files.add(file_key)
+                candidates.append(found_path)
+
+    match len(candidates):
+        case 1:
+            # found exactly one file, so ask the user to confirm it
+            choice = candidates[0]
+            answer = input(f"Found export:\n  {choice}\n\nConvert this file? [Y/n] ").strip().lower()
+            if answer in ("", "y", "yes"):
+                return choice
+
+        case 0:
+            print("Couldn't find a C2 export in this folder.")
+
+        case _:
+            # found more than one, so let the user pick by number
+            print("Found several possible exports:")
+            for number, found_path in enumerate(candidates, 1):
+                print(f"  {number}. {found_path}")
+
+            while True:
+                answer = input("\nPick a number (or paste a path): ").strip()
+                if answer.isdigit() and 1 <= int(answer) <= len(candidates):
+                    return candidates[int(answer) - 1]
+
+                cleaned = clean_path(answer)
+                if cleaned and validate_input_file(cleaned):
+                    return cleaned
+
+                print("Please enter a listed number or a valid file path.")
+
+    # we reach here when nothing was found or the user said no to the one match.
+    # ask them to drag the file in or type its path.
+    while True:
+        answer = input("\nDrag your CSV onto this program, or paste its path:\n--> ").strip()
+        cleaned = clean_path(answer)
+        if cleaned and validate_input_file(cleaned):
+            return cleaned
+
+        print("Please try again with a valid file path.")
+
+
+def main():
+    print("Synology C2 Password  ->  Bitwarden converter")
+    print("------------------------------------")
+    print("Converts a Synology C2 Password export into a Bitwarden CSV.")
+    print("Press Ctrl+C at any time to quit.\n")
+
+    # if a file was dropped onto the program, use it. otherwise go find one.
+    dropped = []
+    for arg in sys.argv[1:]:
+        if arg and arg.strip():
+            dropped.append(clean_path(arg))
+
+    input_path = None
+    if dropped:
+        if validate_input_file(dropped[0]):
+            input_path = dropped[0]
+        else:
+            print()
+
+    if input_path is None:
+        input_path = choose_input()
+
+    try:
+        rows, columns = read_csv(input_path)
+    except ValueError as e:
+        if str(e) == "empty":
+            print(f"\nError: '{input_path}' looks empty.")
+        else:
+            print(f"\nError: couldn't read '{input_path}' with any supported encoding.")
+        finish(1)
+    except FileNotFoundError:
+        print(f"\nError: '{input_path}' was not found.")
+        finish(1)
+    except Exception as e:
+        print(f"\nUnexpected error reading '{input_path}': {e}")
+        finish(1)
+
+    print(f"\nFound {len(rows)} entries.")
+    print(f"Columns detected: {columns}")
+
+    converted, skipped = convert(rows)
+    if not converted:
+        print("\nError: none of the entries had a username, password, or URL.")
+        print("Nothing to import, so no file was written.")
+        finish(1)
+
+    # save the new file next to the export the user picked
+    export_folder = os.path.dirname(os.path.abspath(input_path))
+    out_path = os.path.join(export_folder, "bitwarden_file.csv")
+
+    try:
+        saved = save(converted, out_path)
+    except Exception as e:
+        print(f"\nError saving the Bitwarden file: {e}")
+        finish(1)
+
+    print(f"\nConverted {len(converted)} entries.")
+    print(f"Saved: {saved}")
+
+    if skipped:
+        print(f"\nSkipped {len(skipped)} (NOT transferred):")
+        for name, reason in skipped:
+            print(f"  - {name}  ({reason})")
+        print("\nAdd these to Bitwarden manually if needed.")
+
+    print("\nNext steps:")
+    print("  1. Open your Bitwarden/Vaultwarden web interface")
+    print("  2. Go to Tools > Import Data")
+    print("  3. Choose file format: Bitwarden (.csv)")
+    print(f"  4. Upload: {saved}")
+    print("\nImportant: securely delete the CSV files after importing!")
+
+    finish(0)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        print("\nCancelled.")
+        finish(1)
