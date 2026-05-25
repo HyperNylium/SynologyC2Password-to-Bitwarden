@@ -2,12 +2,12 @@ name: Lint test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - "*.py"
       - "**/*.py"
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - "*.py"
       - "**/*.py"
