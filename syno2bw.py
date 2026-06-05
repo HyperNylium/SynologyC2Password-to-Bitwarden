@@ -2,7 +2,6 @@ import os
 import sys
 import csv
 import glob
-import json
 
 BITWARDEN_FIELDS = [
     "folder", "favorite", "type", "name", "notes", "fields",
@@ -67,93 +66,142 @@ def join_urls(raw: str | None):
     return ",".join(urls)
 
 
-def parse_others(raw: str | None):
-    """Parse the C2 'Others' JSON field.
-
-    Returns a tuple of (bitwarden_custom_fields, notes_lines) where:
-    - bitwarden_custom_fields is a newline-joined string of "selector\tvalue" pairs
-      for AutofillWeb entries (used for autofill matching in Bitwarden/Vaultwarden).
-    - notes_lines is a list of human-readable strings to append under a
-      '--- C2 Import ---' header in the notes field.
-
-    Three types are handled:
-    - AutofillWeb: selector becomes the Bitwarden custom field name (enables
-      autofill); title and value are also written to notes for readability.
-    - Password: a named password without a selector, written to notes only.
-    - Login_Autosave_Web_Anti_Selectors: top-level key (not inside 'Custom'),
-      written to notes only as these are C2-specific autosave exclusions.
-
-    Any type not listed above is written to notes as-is so no data is lost.
-    """
+def has_custom_fields(raw: str | None):
+    """Return True if the Others column contains any AutofillWeb or Password entries."""
     if not is_value_present(raw):
-        return "", []
+        return False
+    try:
+        import json
+        data = json.loads(str(raw))
+        return bool(data.get("Custom"))
+    except (json.JSONDecodeError, AttributeError):
+        return False
+
+
+def categorize_incomplete(rows: list[dict]):
+    """Split rows into five groups based on what data is missing.
+
+    Groups:
+      1 - no username, no password, no custom fields, no URL  (recommend discard)
+      2 - no username, no password, no custom fields, URL present  (recommend discard)
+      3 - username or password missing (but not both), no custom fields
+      4 - no username and no password, but custom fields present
+      5 - username and password present, but no URL
+
+    Rows that have username or password AND a URL are considered complete
+    and are not returned here.
+
+    Returns a dict mapping group number to list of (row_index, row, reason) tuples.
+    row_index is 1-based to match the source CSV line numbers shown to the user.
+    """
+    groups = {1: [], 2: [], 3: [], 4: [], 5: []}
+
+    for index, row in enumerate(rows):
+        row_number = index + 1
+        username   = field(row.get("Login_Username"))
+        password   = field(row.get("Login_Password"))
+        url        = join_urls(row.get("Login_URLs"))
+        customs    = has_custom_fields(row.get("Others"))
+
+        has_user = bool(username)
+        has_pass = bool(password)
+        has_url  = bool(url)
+
+        if not has_user and not has_pass and not customs and not has_url:
+            groups[1].append((row_number, row, "no username, no password, no custom fields, no URL"))
+        elif not has_user and not has_pass and not customs and has_url:
+            groups[2].append((row_number, row, "no username, no password, no custom fields"))
+        elif (not has_user or not has_pass) and not (not has_user and not has_pass) and not customs:
+            reason = "no username" if not has_user else "no password"
+            groups[3].append((row_number, row, reason))
+        elif not has_user and not has_pass and customs:
+            groups[4].append((row_number, row, "no username, no password (credentials in custom fields only)"))
+        elif has_user or has_pass:
+            if not has_url:
+                groups[5].append((row_number, row, "no URL"))
+
+    return groups
+
+
+GROUP_LABELS = {
+    1: "Group 1: No data at all (no username, password, custom fields, or URL)",
+    2: "Group 2: URL only (no username, password, or custom fields)",
+    3: "Group 3: Incomplete credentials (username or password missing)",
+    4: "Group 4: Credentials in custom fields only (no standard username/password)",
+    5: "Group 5: No URL",
+}
+
+GROUP_RECOMMENDED_DISCARD = {1, 2}
+
+
+def prompt_group(group_num: int, entries: list[tuple]):
+    """Show a group to the user and return the set of row indices to discard."""
+    print(f"\n{GROUP_LABELS[group_num]} -- {len(entries)} entr{'y' if len(entries) == 1 else 'ies'}")
+
+    if group_num in GROUP_RECOMMENDED_DISCARD:
+        print("Recommended action: discard all")
+
+    for pos, (row_number, row, reason) in enumerate(entries, 1):
+        name = field(row.get("Display_Name")) or f"(row {row_number})"
+        print(f"  [{pos}] {name}  --  {reason}")
+
+    print("Enter numbers to DISCARD, 'drop' to discard all, or Enter to keep all: ", end="")
 
     try:
-        data = json.loads(str(raw))
-    except json.JSONDecodeError:
-        # unparseable JSON: preserve the raw value in notes so nothing is lost
-        return "", [f"[C2 raw Others]: {str(raw).strip()}"]
+        answer = input().strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return set()
 
-    custom_fields = []
-    notes_lines = []
+    if answer == "drop":
+        return {row_number for row_number, _, _ in entries}
 
-    # handle Login_Autosave_Web_Anti_Selectors (top-level key, not inside Custom)
-    anti_selectors = data.get("Login_Autosave_Web_Anti_Selectors")
-    if anti_selectors:
-        if isinstance(anti_selectors, list):
-            notes_lines.append("[Autosave_Anti_Selectors]: " + ", ".join(str(s) for s in anti_selectors))
+    if not answer:
+        return set()
+
+    to_discard = set()
+    for token in answer.split():
+        if token.isdigit():
+            pos = int(token)
+            if 1 <= pos <= len(entries):
+                row_number = entries[pos - 1][0]
+                to_discard.add(row_number)
+            else:
+                print(f"  (ignored: {pos} is out of range)")
         else:
-            notes_lines.append(f"[Autosave_Anti_Selectors]: {anti_selectors}")
+            print(f"  (ignored: '{token}' is not a number)")
 
-    for entry in data.get("Custom", []):
-        entry_type = entry.get("Type", "")
-
-        if entry_type == "AutofillWeb":
-            title    = entry.get("AutofillWeb_Title", "").strip()
-            aw_type  = entry.get("AutofillWeb_Type", "").strip()
-            value    = entry.get("AutofillWeb", "")
-            selector = entry.get("AutofillWeb_Selector", "").strip()
-
-            if selector:
-                # use the CSS selector as the Bitwarden custom field name so
-                # Bitwarden/Vaultwarden can match it against the page for autofill
-                custom_fields.append(f"{selector}\t{value}")
-
-            # always write title + value to notes regardless of selector presence
-            label = title if title else aw_type
-            notes_lines.append(f"[{label}]: {value}")
-
-        elif entry_type == "Password":
-            # a named password stored without a selector; notes only
-            title = entry.get("Password_Title", "").strip()
-            value = entry.get("Password", "")
-            label = title if title else "Password"
-            notes_lines.append(f"[{label}]: {value}")
-
-        else:
-            # unknown type: write everything to notes so no data is lost
-            notes_lines.append(f"[{entry_type}]: {json.dumps(entry, ensure_ascii=False)}")
-
-    bitwarden_fields_str = "\n".join(custom_fields)
-    return bitwarden_fields_str, notes_lines
+    return to_discard
 
 
-def build_notes(base_notes: str, c2_notes_lines: list[str]):
-    """Combine the original notes with the C2 import section."""
-    if not c2_notes_lines:
-        return base_notes
+def review_incomplete(rows: list[dict]):
+    """Interactively review incomplete entries and return the set of row indices to discard.
 
-    c2_block = "--- C2 Import ---\n" + "\n".join(c2_notes_lines)
+    Row indices are 1-based to match CSV line numbers.
+    Only groups that contain at least one entry are shown.
+    """
+    groups = categorize_incomplete(rows)
 
-    if base_notes:
-        return base_notes + "\n\n" + c2_block
-    return c2_block
+    any_incomplete = any(entries for entries in groups.values())
+    if not any_incomplete:
+        return set()
+
+    print("\n--- Incomplete entries review ---")
+    print("The following entries are missing some data. Review each group and")
+    print("choose which entries to discard. Default is to keep all.\n")
+
+    discard_indices = set()
+    for group_num in sorted(groups.keys()):
+        entries = groups[group_num]
+        if entries:
+            discard_indices |= prompt_group(group_num, entries)
+
+    return discard_indices
 
 
-def convert(rows: list[dict]):
+def convert(rows: list[dict], discard_indices: set[int]):
     """Turn Synology C2 rows into Bitwarden rows. Returns (converted, skipped)."""
     converted = []
-    skipped = []
+    skipped   = []
 
     for index, row in enumerate(rows):
         row_number = index + 1
@@ -163,25 +211,27 @@ def convert(rows: list[dict]):
             username  = field(row.get("Login_Username"))
             password  = field(row.get("Login_Password"))
             display   = field(row.get("Display_Name")).strip()
+            customs   = has_custom_fields(row.get("Others"))
 
-            # parse the Others field for custom fields and notes content
-            bw_custom_fields, c2_notes_lines = parse_others(row.get("Others"))
-
-            # skip rows with no login data.
-            # these are usually cards or other non-login items that cant become a bitwarden login.
-            if not (username or password or login_uri):
-                skipped.append((display or f"(unnamed row {row_number})", "no login info"))
+            # discard entries the user explicitly chose to drop during review
+            if row_number in discard_indices:
+                skipped.append((display or f"(unnamed row {row_number})", "discarded by user"))
                 continue
 
-            notes = build_notes(field(row.get("Notes")), c2_notes_lines)
+            # skip rows with absolutely no login data and no custom fields.
+            # with interactive review these should already be in discard_indices,
+            # but this acts as a safety net if review was skipped.
+            if not (username or password or login_uri or customs):
+                skipped.append((display or f"(unnamed row {row_number})", "no login info"))
+                continue
 
             converted.append({
                 "folder":         "",   # leave folder empty for user to assign during import
                 "favorite":       field(row.get("Favorite")),
                 "type":           "login",  # assuming all entries are of type "login"
                 "name":           display or f"Entry_{row_number}",
-                "notes":          notes,
-                "fields":         bw_custom_fields,
+                "notes":          field(row.get("Notes")),
+                "fields":         "",   # add custom fields manually in Bitwarden for better accuracy
                 "reprompt":       0,    # setting "Master password re-prompt" to "0" for all entries to turn off the option. User can change this later manually.
                 "login_uri":      login_uri,
                 "login_username": username,
@@ -201,7 +251,7 @@ def convert(rows: list[dict]):
 
 def read_csv(path: str):
     """Read a C2 export CSV, trying a few encodings. Returns (rows, columns)."""
-    encodings = ["utf-8", "utf-16", "cp1252", "iso-8859-1"]
+    encodings  = ["utf-8", "utf-16", "cp1252", "iso-8859-1"]
     last_error = None
 
     for encoding in encodings:
@@ -296,7 +346,7 @@ def finish(code: int = 0):
 def choose_input():
     """Find the export file or ask the user for it."""
     # look in the folder the program runs from and the current folder
-    folders     = []
+    folders      = []
     seen_folders = set()
     for folder in (base_dir(), os.getcwd()):
         folder_key = os.path.normcase(os.path.abspath(folder))
@@ -390,7 +440,10 @@ def main():
     print(f"\nFound {len(rows)} entries.")
     print(f"Columns detected: {columns}")
 
-    converted, skipped = convert(rows)
+    # interactively review incomplete entries before converting
+    discard_indices = review_incomplete(rows)
+
+    converted, skipped = convert(rows, discard_indices)
 
     if not converted:
         print("\nError: none of the entries had a username, password, or URL.")
