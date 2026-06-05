@@ -9,6 +9,21 @@ BITWARDEN_FIELDS = [
     "reprompt", "login_uri", "login_username", "login_password", "login_totp",
 ]
 
+# characters that cause Vaultwarden/Bitwarden to fail or silently corrupt data on import.
+# U+2022 BULLET is used by Synology C2 to mask passwords that it could not export in plaintext.
+# U+0000 NULL BYTE breaks CSV parsers.
+# U+FEFF BOM causes parser confusion when embedded mid-field.
+PROBLEMATIC_CHARS = {
+    "\u2022": "U+2022 BULLET (masked/corrupted C2 field)",
+    "\u0000": "U+0000 NULL BYTE",
+    "\ufeff": "U+FEFF BOM",
+}
+
+# default and recommended chunk size for Vaultwarden imports.
+# large imports can time out or run out of browser memory; splitting into smaller
+# files avoids this. 200 entries per file has been found to be reliable.
+DEFAULT_CHUNK_SIZE = 200
+
 
 def clean_path(path_input: str):
     """Clean up a path the user typed or pasted."""
@@ -67,6 +82,68 @@ def join_urls(raw: str | None):
     return ",".join(urls)
 
 
+def sanitize_field(value: str, entry_name: str, field_name: str, warnings: list[str]):
+    """Remove characters that cause Vaultwarden import failures or silent data corruption.
+
+    Problematic characters are removed and replaced with an empty string.
+    Each replacement is logged to the warnings list so the user knows which
+    entries need to be checked after import.
+
+    A note is also appended to the returned value when the entire field consisted
+    only of problematic characters (e.g. a fully masked C2 password like '••••5'),
+    since in that case the field becomes empty and the user needs to set it manually.
+    """
+    if not value:
+        return value, []
+
+    cleaned    = value
+    found      = []
+    fully_masked = False
+
+    for char, description in PROBLEMATIC_CHARS.items():
+        if char in cleaned:
+            # check if the field is entirely composed of this problematic character
+            # (plus digits/whitespace), which indicates a masked C2 export value
+            stripped = cleaned.replace(char, "").strip()
+            if not stripped or stripped.isdigit():
+                fully_masked = True
+            cleaned = cleaned.replace(char, "")
+            found.append(description)
+
+    if found:
+        for desc in found:
+            warnings.append(
+                f"  Warning: '{entry_name}' field '{field_name}' contained {desc} -- removed."
+            )
+        if fully_masked:
+            warnings.append(
+                f"  Warning: '{entry_name}' field '{field_name}' was fully masked "
+                f"(value was only problematic characters). Set this field manually after import."
+            )
+
+    return cleaned, found
+
+
+def sanitize_row(row: dict, entry_name: str):
+    """Sanitize all string fields in a converted Bitwarden row.
+
+    Returns (sanitized_row, warnings) where warnings is a list of strings
+    describing every replacement made. Fields that are not strings (e.g. reprompt)
+    are left untouched.
+    """
+    warnings    = []
+    sanitized   = {}
+
+    for key, value in row.items():
+        if isinstance(value, str):
+            clean, _ = sanitize_field(value, entry_name, key, warnings)
+            sanitized[key] = clean
+        else:
+            sanitized[key] = value
+
+    return sanitized, warnings
+
+
 def parse_others(raw: str | None):
     """Parse the C2 'Others' JSON field.
 
@@ -95,7 +172,7 @@ def parse_others(raw: str | None):
         return "", [f"[C2 raw Others]: {str(raw).strip()}"]
 
     custom_fields = []
-    notes_lines = []
+    notes_lines   = []
 
     # handle Login_Autosave_Web_Anti_Selectors (top-level key, not inside Custom)
     anti_selectors = data.get("Login_Autosave_Web_Anti_Selectors")
@@ -151,9 +228,10 @@ def build_notes(base_notes: str, c2_notes_lines: list[str]):
 
 
 def convert(rows: list[dict]):
-    """Turn Synology C2 rows into Bitwarden rows. Returns (converted, skipped)."""
-    converted = []
-    skipped = []
+    """Turn Synology C2 rows into Bitwarden rows. Returns (converted, skipped, all_warnings)."""
+    converted    = []
+    skipped      = []
+    all_warnings = []
 
     for index, row in enumerate(rows):
         row_number = index + 1
@@ -175,11 +253,15 @@ def convert(rows: list[dict]):
 
             notes = build_notes(field(row.get("Notes")), c2_notes_lines)
 
-            converted.append({
+            # fall back to the URL or a generic name if Display_Name is empty.
+            # Vaultwarden rejects the entire import when any entry has an empty name field.
+            name = display or login_uri or f"Entry_{row_number}"
+
+            bw_row = {
                 "folder":         "",   # leave folder empty for user to assign during import
                 "favorite":       field(row.get("Favorite")),
                 "type":           "login",  # assuming all entries are of type "login"
-                "name":           display or f"Entry_{row_number}",
+                "name":           name,
                 "notes":          notes,
                 "fields":         bw_custom_fields,
                 "reprompt":       0,    # setting "Master password re-prompt" to "0" for all entries to turn off the option. User can change this later manually.
@@ -187,7 +269,14 @@ def convert(rows: list[dict]):
                 "login_username": username,
                 "login_password": password,
                 "login_totp":     field(row.get("Login_TOTP")),
-            })
+            }
+
+            # sanitize all fields to remove characters that break the Vaultwarden importer
+            bw_row, warnings = sanitize_row(bw_row, name)
+            if warnings:
+                all_warnings.extend(warnings)
+
+            converted.append(bw_row)
 
         except Exception:
             # if one row blows up, skip it instead of crashing the whole run
@@ -196,12 +285,30 @@ def convert(rows: list[dict]):
                 display = field(row.get("Display_Name")).strip()
             skipped.append((display or f"(unnamed row {row_number})", "error reading row"))
 
-    return converted, skipped
+    return converted, skipped, all_warnings
+
+
+def ask_chunk_size():
+    """Ask the user whether to split the output into chunks and how large each chunk should be.
+
+    Returns an int chunk size, or None if the user wants a single file.
+    """
+    print(f"\nSplit output into chunks? {DEFAULT_CHUNK_SIZE} recommended.")
+    answer = input("Enter size or Enter for single file: ").strip()
+
+    if not answer:
+        return None
+
+    if answer.isdigit() and int(answer) > 0:
+        return int(answer)
+
+    print(f"Invalid size '{answer}', using single file.")
+    return None
 
 
 def read_csv(path: str):
     """Read a C2 export CSV, trying a few encodings. Returns (rows, columns)."""
-    encodings = ["utf-8", "utf-16", "cp1252", "iso-8859-1"]
+    encodings  = ["utf-8", "utf-16", "cp1252", "iso-8859-1"]
     last_error = None
 
     for encoding in encodings:
@@ -254,6 +361,24 @@ def save(rows: list[dict], path: str):
     return target
 
 
+def save_chunks(rows: list[dict], base_path: str, chunk_size: int):
+    """Split rows into chunks and save each as a separate CSV file.
+
+    Files are named bitwarden_file_part1.csv, bitwarden_file_part2.csv, etc.
+    Returns a list of saved file paths.
+    """
+    base, extension = os.path.splitext(base_path)
+    saved_paths     = []
+
+    for part, start in enumerate(range(0, len(rows), chunk_size), 1):
+        chunk      = rows[start:start + chunk_size]
+        chunk_path = f"{base}_part{part}{extension}"
+        saved      = save(chunk, chunk_path)
+        saved_paths.append(saved)
+
+    return saved_paths
+
+
 def base_dir():
     """Folder the program runs from."""
     # when packaged as an exe look next to the exe instead of this file
@@ -296,7 +421,7 @@ def finish(code: int = 0):
 def choose_input():
     """Find the export file or ask the user for it."""
     # look in the folder the program runs from and the current folder
-    folders     = []
+    folders      = []
     seen_folders = set()
     for folder in (base_dir(), os.getcwd()):
         folder_key = os.path.normcase(os.path.abspath(folder))
@@ -390,25 +515,42 @@ def main():
     print(f"\nFound {len(rows)} entries.")
     print(f"Columns detected: {columns}")
 
-    converted, skipped = convert(rows)
+    converted, skipped, all_warnings = convert(rows)
 
     if not converted:
         print("\nError: none of the entries had a username, password, or URL.")
         print("Nothing to import, so no file was written.")
         finish(1)
 
-    # save the new file next to the export the user picked
+    # show sanitization warnings before asking about chunks so the user
+    # has full information when deciding on chunk size
+    if all_warnings:
+        print(f"\nSanitization warnings ({len(all_warnings)}):")
+        for w in all_warnings:
+            print(w)
+        print("\nCheck these entries in Vaultwarden after import and correct them manually.")
+
+    chunk_size = ask_chunk_size()
+
+    # save the output file(s) next to the export the user picked
     export_folder = os.path.dirname(os.path.abspath(input_path))
     out_path      = os.path.join(export_folder, "bitwarden_file.csv")
 
     try:
-        saved = save(converted, out_path)
+        if chunk_size:
+            saved_paths = save_chunks(converted, out_path, chunk_size)
+            num_chunks  = len(saved_paths)
+            print(f"\nConverted {len(converted)} entries into {num_chunks} file(s) of up to {chunk_size} entries each.")
+            for saved in saved_paths:
+                print(f"  {saved}")
+        else:
+            saved = save(converted, out_path)
+            print(f"\nConverted {len(converted)} entries.")
+            print(f"Saved: {saved}")
+            saved_paths = [saved]
     except Exception as e:
         print(f"\nError saving the Bitwarden file: {e}")
         finish(1)
-
-    print(f"\nConverted {len(converted)} entries.")
-    print(f"Saved: {saved}")
 
     if skipped:
         print(f"\nSkipped {len(skipped)} (NOT transferred):")
@@ -420,7 +562,12 @@ def main():
     print("  1. Open your Bitwarden/Vaultwarden web interface")
     print("  2. Go to Tools > Import Data")
     print("  3. Choose file format: Bitwarden (.csv)")
-    print(f"  4. Upload: {saved}")
+    if chunk_size:
+        print(f"  4. Import each file separately in order:")
+        for saved in saved_paths:
+            print(f"     {saved}")
+    else:
+        print(f"  4. Upload: {saved_paths[0]}")
     print("\nImportant: securely delete the CSV files after importing!")
 
     finish(0)
