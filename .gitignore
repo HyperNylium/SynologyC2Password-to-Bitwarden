@@ -1,0 +1,10 @@
+# uv
+.venv
+
+# pyinstaller
+dist/
+build/
+*.spec
+
+# ruff
+.ruff_cache/
