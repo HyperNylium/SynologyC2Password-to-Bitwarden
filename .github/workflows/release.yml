@@ -2,41 +2,41 @@ name: Build .exe on Release
 run-name: "Build PyInstaller exe for ${{ github.event.release.name }}"
 
 on:
-    release:
-      types: [ published ]
+  release:
+    types: [ published ]
 
 permissions:
-    contents: write
+  contents: write
 
 jobs:
-    build-and-attach-exe:
-      runs-on: windows-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v6
+  build-and-attach-exe:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-        - name: Set up uv
-          uses: astral-sh/setup-uv@v8.2.0
-          with:
-            python-version: "3.13"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: "3.13"
 
-        - name: Build exe (onefile)
-          run: uv run pyinstaller --onefile syno2bw.py
+      - name: Build exe (onefile)
+        run: uv run pyinstaller --onefile syno2bw.py
 
-        - name: Create release-sha256.txt
-          shell: pwsh
-          run: |
-            $exe = "dist/syno2bw.exe"
-            $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
-            "$hash  syno2bw.exe" | Out-File -Encoding utf8 "dist/release-sha256.txt"
-            Get-Content "dist/release-sha256.txt"
+      - name: Create release-sha256.txt
+        shell: pwsh
+        run: |
+          $exe = "dist/syno2bw.exe"
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  syno2bw.exe" | Out-File -Encoding utf8 "dist/release-sha256.txt"
+          Get-Content "dist/release-sha256.txt"
 
-        - name: Upload exe and checksum to release
-          uses: softprops/action-gh-release@v3
-          with:
-            tag_name: ${{ github.event.release.tag_name }}
-            files: |
-              dist/syno2bw.exe
-              dist/release-sha256.txt
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload exe and checksum to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            dist/syno2bw.exe
+            dist/release-sha256.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
