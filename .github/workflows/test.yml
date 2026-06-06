@@ -4,13 +4,13 @@ on:
   push:
     branches: [ master ]
     paths:
-    - "*.py"
-    - "**/*.py"
+      - "*.py"
+      - "**/*.py"
   pull_request:
     branches: [ master ]
     paths:
-    - "*.py"
-    - "**/*.py"
+      - "*.py"
+      - "**/*.py"
 
 jobs:
   ruff-lint:
