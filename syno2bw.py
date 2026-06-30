@@ -2,16 +2,37 @@ import os
 import sys
 import csv
 import glob
+import json
+import uuid
 
 
-BITWARDEN_FIELDS = [
-    "folder", "favorite", "type", "name", "notes", "fields",
-    "reprompt", "login_uri", "login_username", "login_password", "login_totp",
-]
+# bitwarden item type numbers
+LOGIN_TYPE = 1
+SECURE_NOTE_TYPE = 2
+CARD_TYPE = 3
+
+# bitwarden custom field type numbers
+TEXT_FIELD = 0
+HIDDEN_FIELD = 1
+
+# card types we know how to name the bitwarden way
+CARD_BRANDS = {
+    "visa": "Visa",
+    "mastercard": "Mastercard",
+    "amex": "Amex",
+    "american express": "Amex",
+    "discover": "Discover",
+    "diners club": "Diners Club",
+    "jcb": "JCB",
+    "maestro": "Maestro",
+    "unionpay": "UnionPay",
+    "rupay": "RuPay",
+}
 
 
 def clean_path(path_input: str):
     """Clean up a path the user typed or pasted."""
+
     if not path_input:
         return None
 
@@ -24,6 +45,7 @@ def clean_path(path_input: str):
 
 def validate_input_file(file_path: str):
     """Check the path exists and can be read."""
+
     if not os.path.exists(file_path):
         print(f"Error: The file '{file_path}' was not found.")
         return False
@@ -45,6 +67,7 @@ def validate_input_file(file_path: str):
 
 def is_value_present(value: str | None):
     """True if the value has real content."""
+
     if value is None:
         return False
 
@@ -54,55 +77,214 @@ def is_value_present(value: str | None):
 
 def field(value: str | None):
     """Return the value as text or empty string if blank."""
+
     return str(value) if is_value_present(value) else ""
 
 
-def join_urls(raw: str | None):
-    """Join the C2 URL lines into one comma separated cell."""
+def build_uris(raw: str | None):
+    """Turn the C2 URL lines into the bitwarden uris list."""
+
     if not is_value_present(raw):
+        return []
+
+    # synology puts each url on its own line. bitwarden wants a list of uri objects.
+    uris = []
+    for part in str(raw).strip().split("\n"):
+        cleaned = part.strip()
+        if cleaned:
+            uris.append({"match": None, "uri": cleaned})
+
+    return uris
+
+
+def custom_field(name: str, value: str | None, field_type: int):
+    """Make one bitwarden custom field."""
+
+    return {
+        "name": name,
+        "value": field(value),
+        "type": field_type
+    }
+
+
+def parse_expiry(raw: str | None):
+    """Pull month and year out of a card expiry like 01/28. Returns (month, year, raw_if_bad)."""
+
+    text = field(raw).strip()
+    if not text:
+        return "", "", ""
+
+    # a good expiry looks like MM/YY or MM/YYYY
+    parts = text.split("/")
+    if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+        month = parts[0].strip()
+        year = parts[1].strip()
+
+        # two digit year like 28 means 2028
+        if len(year) == 2:
+            year = "20" + year
+
+        month_number = int(month)
+        if 1 <= month_number <= 12:
+            return str(month_number), year, ""
+
+    # could not read it so hand back the raw text to keep it
+    return "", "", text
+
+
+def normalize_brand(raw: str | None):
+    """Match the card type to a bitwarden brand name."""
+
+    text = field(raw).strip()
+    if not text:
         return ""
 
-    # synology puts each url on its own line but bitwarden wants them in one cell split by commas
-    urls = []
-    for part in str(raw).strip().split("\n"):
-        urls.append(part.strip())
+    known = CARD_BRANDS.get(text.lower())
+    if known:
+        return known
 
-    return ",".join(urls)
+    # not a known brand
+    return "Other"
+
+
+def parse_others(raw: str | None):
+    """Read the Others column json. Returns a dict or None if there is nothing usable."""
+
+    if not is_value_present(raw):
+        return None
+
+    try:
+        data = json.loads(str(raw))
+    except (ValueError, TypeError):
+        return None
+
+    if isinstance(data, dict):
+        return data
+
+    return None
+
+
+def base_item(item_type: int, name: str, notes: str, favorite: bool):
+    """Build the parts every bitwarden item shares."""
+
+    return {
+        "id": str(uuid.uuid4()),
+        "organizationId": None,
+        "folderId": None,  # leave empty so the user picks the folder during import
+        "type": item_type,
+        "name": name,
+        "notes": notes or None,
+        "favorite": favorite,
+        "fields": [],
+        "reprompt": 0,  # master password re-prompt off. user can turn it on later.
+        "collectionIds": None,
+    }
+
+
+def build_login(row: dict, name: str, notes: str, favorite: bool):
+    """Build a bitwarden login item from a C2 row."""
+
+    item = base_item(LOGIN_TYPE, name, notes, favorite)
+    item["login"] = {
+        "uris": build_uris(row.get("Login_URLs")),
+        "username": field(row.get("Login_Username")) or None,
+        "password": field(row.get("Login_Password")) or None,
+        "totp": field(row.get("Login_TOTP")) or None,
+    }
+    return item
+
+
+def build_card(row: dict, others: dict, name: str, notes: str, favorite: bool):
+    """Build a bitwarden card item from a C2 row and its Others data."""
+
+    item = base_item(CARD_TYPE, name, notes, favorite)
+
+    exp_month, exp_year, bad_expiry = parse_expiry(others.get("Card_Expiry"))
+
+    item["card"] = {
+        "cardholderName": field(others.get("Card_Name")) or None,
+        "brand": normalize_brand(others.get("Card_Type")) or None,
+        "number": field(others.get("Card_Number")).replace(" ", "") or None,
+        "expMonth": exp_month or None,
+        "expYear": exp_year or None,
+        "code": field(others.get("Card_CVV")) or None,
+    }
+
+    # bitwarden cards have no slot for these so keep them as custom fields
+    extra_fields = [
+        ("Card_PIN", others.get("Card_PIN"), HIDDEN_FIELD),
+        ("Card_Phone", others.get("Card_Phone"), TEXT_FIELD),
+        ("Card_URL", others.get("Card_URL"), TEXT_FIELD),
+    ]
+    for field_name, value, field_type in extra_fields:
+        if is_value_present(value):
+            item["fields"].append(custom_field(field_name, value, field_type))
+
+    # if the expiry did not parse keep the raw text so it is not lost
+    if bad_expiry:
+        item["fields"].append(custom_field("Card_Expiry", bad_expiry, TEXT_FIELD))
+
+    return item
+
+
+def build_secure_note(others: dict, name: str, notes: str, favorite: bool):
+    """Build a bitwarden secure note item from a C2 row and its Others data."""
+
+    secure_text = field(others.get("Secure_Note"))
+
+    # the secure note body is the main content.
+    # if the Notes column also has text we keep both joined together.
+    if notes and secure_text:
+        combined = notes + "\n\n" + secure_text
+    elif secure_text:
+        combined = secure_text
+    else:
+        combined = notes
+
+    item = base_item(SECURE_NOTE_TYPE, name, combined, favorite)
+    item["secureNote"] = {"type": 0}
+    return item
 
 
 def convert(rows: list[dict]):
-    """Turn Synology C2 rows into Bitwarden rows. Returns (converted, skipped)."""
-    converted = []
+    """Turn Synology C2 rows into Bitwarden items. Returns (items, skipped)."""
+
+    items = []
     skipped = []
 
     for index, row in enumerate(rows):
         row_number = index + 1
 
         try:
-            login_uri = join_urls(row.get("Login_URLs", ""))
-            username = field(row.get("Login_Username"))
-            password = field(row.get("Login_Password"))
             display = field(row.get("Display_Name")).strip()
+            name = display or f"Entry_{row_number}"
+            notes = field(row.get("Notes"))
+            favorite = is_value_present(row.get("Favorite"))
+            others = parse_others(row.get("Others"))
 
-            # skip rows with no login data.
-            # these are usually cards or other non-login items that cant become a bitwarden login.
-            if not (username or password or login_uri):
-                skipped.append((display or f"(unnamed row {row_number})", "no login info"))
-                continue
+            item_type = ""
+            if others is not None:
+                item_type = str(others.get("Type", "")).strip().lower()
 
-            converted.append({
-                "folder": "",  # leave folder empty for user to assign during import
-                "favorite": field(row.get("Favorite")),
-                "type": "login",  # assuming all entries are of type "login"
-                "name": display or f"Entry_{row_number}",
-                "notes": field(row.get("Notes")),
-                "fields": "",  # add custom fields manually in Bitwarden for better accuracy
-                "reprompt": 0,  # setting "Master password re-prompt" to "0" for all entries to turn off the option. User can change this later manually.
-                "login_uri": login_uri,
-                "login_username": username,
-                "login_password": password,
-                "login_totp": field(row.get("Login_TOTP")),
-            })
+            match item_type:
+                case "card":
+                    items.append(build_card(row, others, name, notes, favorite))
+
+                case "secure":
+                    items.append(build_secure_note(others, name, notes, favorite))
+
+                case _:  # default to login if the type is unknown or missing
+                    username = field(row.get("Login_Username"))
+                    password = field(row.get("Login_Password"))
+                    uris = build_uris(row.get("Login_URLs"))
+
+                    if username or password or uris:
+                        items.append(build_login(row, name, notes, favorite))
+                    elif others is not None:
+                        reason = f"unsupported type '{others.get('Type')}'"
+                        skipped.append((name, reason))
+                    else:
+                        skipped.append((name, "no login info"))
 
         except Exception:
             # if one row blows up, skip it instead of crashing the whole run
@@ -111,11 +293,12 @@ def convert(rows: list[dict]):
                 display = field(row.get("Display_Name")).strip()
             skipped.append((display or f"(unnamed row {row_number})", "error reading row"))
 
-    return converted, skipped
+    return items, skipped
 
 
 def read_csv(path: str):
     """Read a C2 export CSV, trying a few encodings. Returns (rows, columns)."""
+
     encodings = ["utf-8", "utf-16", "cp1252", "iso-8859-1"]
     last_error = None
 
@@ -151,8 +334,9 @@ def read_csv(path: str):
     raise ValueError("encoding") from last_error
 
 
-def save(rows: list[dict], path: str):
-    """Write rows to a CSV without overwriting an existing file."""
+def save(items: list[dict], path: str):
+    """Write items to a Bitwarden JSON file without overwriting an existing file."""
+
     folder = os.path.dirname(path)
     if folder:
         os.makedirs(folder, exist_ok=True)
@@ -165,16 +349,18 @@ def save(rows: list[dict], path: str):
         target = f"{base}_{counter}{extension}"
         counter += 1
 
-    with open(target, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=BITWARDEN_FIELDS)
-        writer.writeheader()
-        writer.writerows(rows)
+    # bitwarden wants folders and items. we leave folders empty on purpose.
+    payload = {"folders": [], "items": items}
+
+    with open(target, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
 
     return target
 
 
 def base_dir():
     """Folder the program runs from."""
+
     # when packaged as an exe look next to the exe instead of this file
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
@@ -184,6 +370,7 @@ def base_dir():
 
 def find_export(folder: str):
     """Find possible C2 export files in a folder."""
+
     if not os.path.isdir(folder):
         return []
 
@@ -207,6 +394,7 @@ def find_export(folder: str):
 
 def finish(code: int = 0):
     """Pause so the output stays on screen, then exit."""
+
     try:
         input("\nPress Enter to close...")
     except EOFError:
@@ -217,6 +405,7 @@ def finish(code: int = 0):
 
 def choose_input():
     """Find the export file or ask the user for it."""
+
     # look in the folder the program runs from and the current folder
     folders = []
     seen_folders = set()
@@ -278,7 +467,7 @@ def choose_input():
 def main():
     print("Synology C2 Password  ->  Bitwarden converter")
     print("------------------------------------")
-    print("Converts a Synology C2 Password export into a Bitwarden CSV.")
+    print("Converts a Synology C2 Password export into a Bitwarden JSON file.")
     print("Press Ctrl+C at any time to quit.\n")
 
     # if a file was dropped onto the program, use it. otherwise go find one.
@@ -315,23 +504,23 @@ def main():
     print(f"\nFound {len(rows)} entries.")
     print(f"Columns detected: {columns}")
 
-    converted, skipped = convert(rows)
-    if not converted:
-        print("\nError: none of the entries had a username, password, or URL.")
+    items, skipped = convert(rows)
+    if not items:
+        print("\nError: none of the entries could be converted.")
         print("Nothing to import, so no file was written.")
         finish(1)
 
     # save the new file next to the export the user picked
     export_folder = os.path.dirname(os.path.abspath(input_path))
-    out_path = os.path.join(export_folder, "bitwarden_file.csv")
+    out_path = os.path.join(export_folder, "bitwarden_file.json")
 
     try:
-        saved = save(converted, out_path)
+        saved = save(items, out_path)
     except Exception as e:
         print(f"\nError saving the Bitwarden file: {e}")
         finish(1)
 
-    print(f"\nConverted {len(converted)} entries.")
+    print(f"\nConverted {len(items)} entries.")
     print(f"Saved: {saved}")
 
     if skipped:
@@ -343,9 +532,9 @@ def main():
     print("\nNext steps:")
     print("  1. Open your Bitwarden/Vaultwarden web interface")
     print("  2. Go to Tools > Import Data")
-    print("  3. Choose file format: Bitwarden (.csv)")
+    print("  3. Choose file format: Bitwarden (json)")
     print(f"  4. Upload: {saved}")
-    print("\nImportant: securely delete the CSV files after importing!")
+    print("\nImportant: securely delete the JSON files after importing!")
 
     finish(0)
 
