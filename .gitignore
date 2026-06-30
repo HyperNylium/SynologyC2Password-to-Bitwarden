@@ -8,3 +8,6 @@ build/
 
 # ruff
 .ruff_cache/
+
+# test data
+C2Password_Export_*.csv
