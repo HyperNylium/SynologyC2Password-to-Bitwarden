@@ -227,10 +227,84 @@ def build_card(row: dict, others: dict, name: str, notes: str, favorite: bool):
     return item
 
 
-def build_secure_note(others: dict, name: str, notes: str, favorite: bool):
+def build_secure_note(others: dict, name: str, notes: str, favorite: bool, item_type: str = ""):
     """Build a bitwarden secure note item from a C2 row and its Others data."""
 
     secure_text = field(others.get("Secure_Note"))
+
+    # For specific types (ID, Bank, Driver, Router), extract all relevant fields
+    if item_type in ("id", "bank", "driver", "router"):
+        type_specific_notes = []
+        
+        # Common fields - check for both prefixed and non-prefixed versions
+        # The prefix in the JSON is Title Case (Driver, Bank, Router) or all caps (ID)
+        prefix = item_type.upper() if item_type == "id" else item_type.title()
+        first_name = field(others.get("First_Name") or others.get(f"{prefix}_First_Name"))
+        if first_name:
+            type_specific_notes.append(f"First Name: {first_name}")
+        last_name = field(others.get("Last_Name") or others.get(f"{prefix}_Last_Name"))
+        if last_name:
+            type_specific_notes.append(f"Last Name: {last_name}")
+        
+        # Type-specific fields
+        if item_type == "id":
+            if "ID_Number" in others:
+                type_specific_notes.append(f"ID Number: {field(others.get('ID_Number'))}")
+            if "ID_Birthday" in others:
+                type_specific_notes.append(f"Birthday: {field(others.get('ID_Birthday'))}")
+            if "ID_Nationality" in others:
+                type_specific_notes.append(f"Nationality: {field(others.get('ID_Nationality'))}")
+            if "ID_Birth_Place" in others:
+                type_specific_notes.append(f"Birth Place: {field(others.get('ID_Birth_Place'))}")
+            if "ID_Issue" in others:
+                type_specific_notes.append(f"Issue Date: {field(others.get('ID_Issue'))}")
+            if "ID_Expiry" in others:
+                type_specific_notes.append(f"Expiry Date: {field(others.get('ID_Expiry'))}")
+            if "ID_Gender" in others:
+                type_specific_notes.append(f"Gender: {field(others.get('ID_Gender'))}")
+            # ID Address can be a nested object
+            addr_data = others.get("ID_Address")
+            if isinstance(addr_data, dict):
+                if "Address" in addr_data:
+                    type_specific_notes.append(f"Address: {field(addr_data.get('Address'))}")
+                if "City_Town" in addr_data:
+                    type_specific_notes.append(f"City: {field(addr_data.get('City_Town'))}")
+        
+        elif item_type == "bank":
+            if "Bank_Name" in others:
+                type_specific_notes.append(f"Bank: {field(others.get('Bank_Name'))}")
+            if "Bank_Account" in others:
+                type_specific_notes.append(f"Account: {field(others.get('Bank_Account'))}")
+            if "Bank_Acc_Type" in others:
+                type_specific_notes.append(f"Account Type: {field(others.get('Bank_Acc_Type'))}")
+            if "Bank_Branch" in others:
+                type_specific_notes.append(f"Branch: {field(others.get('Bank_Branch'))}")
+            if "Bank_Routing" in others:
+                type_specific_notes.append(f"Routing: {field(others.get('Bank_Routing'))}")
+            if "Bank_PIN" in others:
+                type_specific_notes.append(f"PIN: {field(others.get('Bank_PIN'))}")
+        
+        elif item_type == "driver":
+            if "Driver_Number" in others:
+                type_specific_notes.append(f"License Number: {field(others.get('Driver_Number'))}")
+            if "Driver_Birthday" in others:
+                type_specific_notes.append(f"Birthday: {field(others.get('Driver_Birthday'))}")
+            if "Driver_Issue" in others:
+                type_specific_notes.append(f"Issue Date: {field(others.get('Driver_Issue'))}")
+            if "Driver_Expiry" in others:
+                type_specific_notes.append(f"Expiry Date: {field(others.get('Driver_Expiry'))}")
+            if "Driver_Gender" in others:
+                type_specific_notes.append(f"Gender: {field(others.get('Driver_Gender'))}")
+            if "Driver_Address" in others:
+                type_specific_notes.append(f"Address: {field(others.get('Driver_Address'))}")
+            if "Driver_City_Town" in others:
+                type_specific_notes.append(f"City: {field(others.get('Driver_City_Town'))}")
+        
+        elif item_type == "router":
+            if "Router_Password" in others:
+                type_specific_notes.append(f"Password: {field(others.get('Router_Password'))}")
+        
+        secure_text = "\n".join(type_specific_notes) if type_specific_notes else secure_text
 
     # the secure note body is the main content.
     # if the Notes column also has text we keep both joined together.
@@ -271,7 +345,10 @@ def convert(rows: list[dict]):
                     items.append(build_card(row, others, name, notes, favorite))
 
                 case "secure":
-                    items.append(build_secure_note(others, name, notes, favorite))
+                    items.append(build_secure_note(others, name, notes, favorite, item_type))
+
+                case "id" | "bank" | "driver" | "router":
+                    items.append(build_secure_note(others, name, notes, favorite, item_type))
 
                 case _:  # default to login if the type is unknown or missing
                     username = field(row.get("Login_Username"))
@@ -395,10 +472,12 @@ def find_export(folder: str):
 def finish(code: int = 0):
     """Pause so the output stays on screen, then exit."""
 
-    try:
-        input("\nPress Enter to close...")
-    except EOFError:
-        pass
+    # Only pause if we're running interactively (not in tests/CI)
+    if sys.stdin.isatty():
+        try:
+            input("\nPress Enter to close...")
+        except EOFError:
+            pass
 
     sys.exit(code)
 

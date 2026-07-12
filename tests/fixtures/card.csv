@@ -1,0 +1,3 @@
+Display_Name,Notes,Login_Username,Login_Password,Login_URLs,Login_TOTP,Favorite,Others
+"My Card","Bank card",,,,"{}",false,"{{\"Type\":\"card\", \"Card_Number\":\"1234 5678 9012 3456\", \"Card_Name\":\"John Doe\", \"Card_Type\":\"visa\", \"Card_Expiry\":\"12/25\", \"Card_CVV\":\"123\", \"Card_PIN\":\"4567\", \"Card_Phone\":\"+1234567890\", \"Card_URL\":\"https://bank.com\"}}"
+"My Card No Expiry",,"\"\"\",\"\"\",,"{}",false,"{{\"Type\":\"card\", \"Card_Number\":\"1111222233334444\", \"Card_Type\":\"mastercard\"}}"

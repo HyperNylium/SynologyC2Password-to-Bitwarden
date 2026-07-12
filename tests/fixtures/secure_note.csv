@@ -1,0 +1,3 @@
+Display_Name,Notes,Login_Username,Login_Password,Login_URLs,Login_TOTP,Favorite,Others
+"My Note","Some notes",,,,,"{}",false,"{{\"Type\":\"secure\", \"Secure_Note\":\"This is a secret\"}}"
+"Note with Existing Notes","Existing content",,,,,"{}",true,"{{\"Type\":\"secure\", \"Secure_Note\":\"Additional secret\"}}"
