@@ -9,6 +9,12 @@ dependencies = []
 dev = [
     "pyinstaller>=6.20.0",
     "ruff>=0.15.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
 ]
 
 [tool.uv]
@@ -24,3 +30,9 @@ preview = true
 select = ["E", "W", "F", "B", "UP", "RUF"]
 ignore = ["E501", "UP015", "E712"]
 extend-select = ["TID252"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "--verbose --color=yes"
+
