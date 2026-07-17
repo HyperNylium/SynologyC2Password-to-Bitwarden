@@ -235,7 +235,7 @@ def build_secure_note(others: dict, name: str, notes: str, favorite: bool, item_
     # For specific types (ID, Bank, Driver, Router), extract all relevant fields
     if item_type in ("id", "bank", "driver", "router"):
         type_specific_notes = []
-        
+
         # Common fields - check for both prefixed and non-prefixed versions
         # The prefix in the JSON is Title Case (Driver, Bank, Router) or all caps (ID)
         prefix = item_type.upper() if item_type == "id" else item_type.title()
@@ -245,7 +245,7 @@ def build_secure_note(others: dict, name: str, notes: str, favorite: bool, item_
         last_name = field(others.get("Last_Name") or others.get(f"{prefix}_Last_Name"))
         if last_name:
             type_specific_notes.append(f"Last Name: {last_name}")
-        
+
         # Type-specific fields
         if item_type == "id":
             if "ID_Number" in others:
@@ -269,7 +269,7 @@ def build_secure_note(others: dict, name: str, notes: str, favorite: bool, item_
                     type_specific_notes.append(f"Address: {field(addr_data.get('Address'))}")
                 if "City_Town" in addr_data:
                     type_specific_notes.append(f"City: {field(addr_data.get('City_Town'))}")
-        
+
         elif item_type == "bank":
             if "Bank_Name" in others:
                 type_specific_notes.append(f"Bank: {field(others.get('Bank_Name'))}")
@@ -283,7 +283,7 @@ def build_secure_note(others: dict, name: str, notes: str, favorite: bool, item_
                 type_specific_notes.append(f"Routing: {field(others.get('Bank_Routing'))}")
             if "Bank_PIN" in others:
                 type_specific_notes.append(f"PIN: {field(others.get('Bank_PIN'))}")
-        
+
         elif item_type == "driver":
             if "Driver_Number" in others:
                 type_specific_notes.append(f"License Number: {field(others.get('Driver_Number'))}")
@@ -299,11 +299,11 @@ def build_secure_note(others: dict, name: str, notes: str, favorite: bool, item_
                 type_specific_notes.append(f"Address: {field(others.get('Driver_Address'))}")
             if "Driver_City_Town" in others:
                 type_specific_notes.append(f"City: {field(others.get('Driver_City_Town'))}")
-        
+
         elif item_type == "router":
             if "Router_Password" in others:
                 type_specific_notes.append(f"Password: {field(others.get('Router_Password'))}")
-        
+
         secure_text = "\n".join(type_specific_notes) if type_specific_notes else secure_text
 
     # the secure note body is the main content.

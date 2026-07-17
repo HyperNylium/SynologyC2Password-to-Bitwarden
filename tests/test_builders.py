@@ -8,8 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from syno2bw import (
     build_login, build_card, build_secure_note,
-    LOGIN_TYPE, SECURE_NOTE_TYPE, CARD_TYPE,
-    TEXT_FIELD, HIDDEN_FIELD
+    LOGIN_TYPE, SECURE_NOTE_TYPE, CARD_TYPE
 )
 
 

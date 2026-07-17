@@ -41,7 +41,7 @@ class TestConvert:
                 "Others": '{"Type": "card", "Card_Number": "1234"}'
             }
         ]
-        items, skipped = convert(rows)
+        items, _skipped = convert(rows)
         assert len(items) == 1
         assert items[0]["type"] == CARD_TYPE
 
@@ -57,7 +57,7 @@ class TestConvert:
                 "Others": '{"Type": "secure", "Secure_Note": "Secret"}'
             }
         ]
-        items, skipped = convert(rows)
+        items, _skipped = convert(rows)
         assert len(items) == 1
         assert items[0]["type"] == SECURE_NOTE_TYPE
 
@@ -134,7 +134,7 @@ class TestConvert:
                 "Others": '{"Type": "id", "Secure_Note": "123"}'
             },
         ]
-        items, skipped = convert(rows)
+        items, _skipped = convert(rows)
         assert len(items) == 3
         types = {item["type"] for item in items}
         assert LOGIN_TYPE in types
@@ -150,7 +150,7 @@ class TestConvert:
             "Favorite": "true",
             "Others": "{}"
         }]
-        items, skipped = convert(rows)
+        items, _skipped = convert(rows)
         assert items[0]["favorite"] is True
 
     def test_convert_handles_malformed_row(self):

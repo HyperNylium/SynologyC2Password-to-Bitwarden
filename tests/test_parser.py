@@ -54,16 +54,16 @@ class TestReadCSV:
         assert "Login_Username" in columns
 
     def test_read_card_csv(self):
-        rows, columns = read_csv("tests/fixtures/card.csv")
+        rows, _columns = read_csv("tests/fixtures/card.csv")
         assert len(rows) == 2
         assert rows[0]["Display_Name"] == "My Card"
 
     def test_read_secure_note_csv(self):
-        rows, columns = read_csv("tests/fixtures/secure_note.csv")
+        rows, _columns = read_csv("tests/fixtures/secure_note.csv")
         assert len(rows) == 2
 
     def test_read_new_types_csv(self):
-        rows, columns = read_csv("tests/fixtures/new_types.csv")
+        rows, _columns = read_csv("tests/fixtures/new_types.csv")
         assert len(rows) == 5
         assert all("Display_Name" in row for row in rows)
 
@@ -71,7 +71,7 @@ class TestReadCSV:
         # Create UTF-16 file
         utf16_file = tmp_path / "utf16.csv"
         utf16_file.write_bytes("Display_Name\nTest\n".encode("utf-16"))
-        rows, columns = read_csv(str(utf16_file))
+        rows, _columns = read_csv(str(utf16_file))
         assert len(rows) == 1
 
     def test_empty_csv(self, tmp_path):

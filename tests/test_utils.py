@@ -140,7 +140,7 @@ class TestParseExpiry:
         assert raw == ""
 
     def test_mm_yyyy(self):
-        month, year, raw = parse_expiry("12/2025")
+        month, year, _raw = parse_expiry("12/2025")
         assert month == "12"
         assert year == "2025"
 
@@ -151,18 +151,18 @@ class TestParseExpiry:
         assert raw == "invalid"
 
     def test_mm_only(self):
-        month, year, raw = parse_expiry("13/25")  # Invalid month
+        month, year, _raw = parse_expiry("13/25")  # Invalid month
         assert month == ""
         assert year == ""
 
     def test_yy_mm_format(self):
         # Should not work (wrong format)
-        month, year, raw = parse_expiry("25/01")
+        month, year, _raw = parse_expiry("25/01")
         assert month == ""
         assert year == ""
 
     def test_with_spaces(self):
-        month, year, raw = parse_expiry(" 01 / 25 ")
+        month, year, _raw = parse_expiry(" 01 / 25 ")
         assert month == "1"
         assert year == "2025"
 

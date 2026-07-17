@@ -32,7 +32,7 @@ class TestIntegration:
             os.chdir(tmpdir)
 
             try:
-                with contextlib.redirect_stdout(io.StringIO()) as cap_out:
+                with contextlib.redirect_stdout(io.StringIO()):
                     try:
                         main()
                     except SystemExit:
@@ -180,7 +180,7 @@ class TestIntegration:
                 "Others": json.dumps({"Type": type_name, "Secure_Note": secure_note})
             }]
 
-            items, skipped = convert(rows)
+            items, _skipped = convert(rows)
             assert len(items) == 1
             assert items[0]["type"] == 2  # SECURE_NOTE_TYPE
             assert items[0]["name"] == name
