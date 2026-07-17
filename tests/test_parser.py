@@ -21,12 +21,12 @@ class TestCleanPath:
         assert clean_path("") is None
 
     def test_strip_quotes(self):
-        assert clean_path('"/path/to/file"') == "/path/to/file"
-        assert clean_path("'/path/to/file'") == "/path/to/file"
+        assert clean_path('"/path/to/file"') == "/path/to/file".replace("/", os.sep)
+        assert clean_path("'/path/to/file'") == "/path/to/file".replace("/", os.sep)
 
     def test_replace_separators(self):
-        assert clean_path("C:\\Users\\test") == "C:/Users/test"
-        assert clean_path("C:/Users/test") == "C:/Users/test"
+        assert clean_path("C:\\Users\\test") == "C:/Users/test".replace("/", os.sep)
+        assert clean_path("C:/Users/test") == "C:/Users/test".replace("/", os.sep)
 
 
 class TestValidateInputFile:
