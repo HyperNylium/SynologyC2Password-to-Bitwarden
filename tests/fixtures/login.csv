@@ -1,0 +1,4 @@
+Display_Name,Notes,Login_Username,Login_Password,Login_URLs,Login_TOTP,Favorite,Others
+Test Login,"My note",user1,pass1,"https://example.com",,true,{}
+Empty Login,,,,,,"{}"
+Login with TOTP,"2FA test",user2,pass2,"https://test.com",123456,false,{}

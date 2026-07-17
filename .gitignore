@@ -11,3 +11,4 @@ build/
 
 # test data
 C2Password_Export_*.csv
+bitwarden_file.json

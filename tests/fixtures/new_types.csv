@@ -1,0 +1,6 @@
+Display_Name,Notes,Login_Username,Login_Password,Login_URLs,Login_TOTP,Favorite,Others
+"My ID","ID Number 123",,,,,"{}",false,"{{\"Type\":\"id\", \"Secure_Note\":\"National ID: 12345678\"}}"
+"My Bank","Account info",,,,,"{}",false,"{{\"Type\":\"bank\", \"Secure_Note\":\"IBAN: FR76 1234 5678 9012 3456 7890 123\"}}"
+"My Driver","License",,,,,"{}",false,"{{\"Type\":\"driver\", \"Secure_Note\":\"License: ABC123XYZ\"}}"
+"My Router","Admin creds",,,,,"{}",false,"{{\"Type\":\"router\", \"Secure_Note\":\"IP: 192.168.1.1\nUser: admin\nPass: secret\"}}"
+"Mixed Type","Combined",user,pass,"https://router.com",,"{}",false,"{{\"Type\":\"router\", \"Secure_Note\":\"Backup config\"}}"
