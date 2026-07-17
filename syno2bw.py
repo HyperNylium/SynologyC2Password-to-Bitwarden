@@ -227,84 +227,10 @@ def build_card(row: dict, others: dict, name: str, notes: str, favorite: bool):
     return item
 
 
-def build_secure_note(others: dict, name: str, notes: str, favorite: bool, item_type: str = ""):
+def note_item(lines: list[str], others: dict, name: str, notes: str, favorite: bool):
     """Build a bitwarden secure note item from a C2 row and its Others data."""
 
-    secure_text = field(others.get("Secure_Note"))
-
-    # For specific types (ID, Bank, Driver, Router), extract all relevant fields
-    if item_type in ("id", "bank", "driver", "router"):
-        type_specific_notes = []
-
-        # Common fields - check for both prefixed and non-prefixed versions
-        # The prefix in the JSON is Title Case (Driver, Bank, Router) or all caps (ID)
-        prefix = item_type.upper() if item_type == "id" else item_type.title()
-        first_name = field(others.get("First_Name") or others.get(f"{prefix}_First_Name"))
-        if first_name:
-            type_specific_notes.append(f"First Name: {first_name}")
-        last_name = field(others.get("Last_Name") or others.get(f"{prefix}_Last_Name"))
-        if last_name:
-            type_specific_notes.append(f"Last Name: {last_name}")
-
-        # Type-specific fields
-        if item_type == "id":
-            if "ID_Number" in others:
-                type_specific_notes.append(f"ID Number: {field(others.get('ID_Number'))}")
-            if "ID_Birthday" in others:
-                type_specific_notes.append(f"Birthday: {field(others.get('ID_Birthday'))}")
-            if "ID_Nationality" in others:
-                type_specific_notes.append(f"Nationality: {field(others.get('ID_Nationality'))}")
-            if "ID_Birth_Place" in others:
-                type_specific_notes.append(f"Birth Place: {field(others.get('ID_Birth_Place'))}")
-            if "ID_Issue" in others:
-                type_specific_notes.append(f"Issue Date: {field(others.get('ID_Issue'))}")
-            if "ID_Expiry" in others:
-                type_specific_notes.append(f"Expiry Date: {field(others.get('ID_Expiry'))}")
-            if "ID_Gender" in others:
-                type_specific_notes.append(f"Gender: {field(others.get('ID_Gender'))}")
-            # ID Address can be a nested object
-            addr_data = others.get("ID_Address")
-            if isinstance(addr_data, dict):
-                if "Address" in addr_data:
-                    type_specific_notes.append(f"Address: {field(addr_data.get('Address'))}")
-                if "City_Town" in addr_data:
-                    type_specific_notes.append(f"City: {field(addr_data.get('City_Town'))}")
-
-        elif item_type == "bank":
-            if "Bank_Name" in others:
-                type_specific_notes.append(f"Bank: {field(others.get('Bank_Name'))}")
-            if "Bank_Account" in others:
-                type_specific_notes.append(f"Account: {field(others.get('Bank_Account'))}")
-            if "Bank_Acc_Type" in others:
-                type_specific_notes.append(f"Account Type: {field(others.get('Bank_Acc_Type'))}")
-            if "Bank_Branch" in others:
-                type_specific_notes.append(f"Branch: {field(others.get('Bank_Branch'))}")
-            if "Bank_Routing" in others:
-                type_specific_notes.append(f"Routing: {field(others.get('Bank_Routing'))}")
-            if "Bank_PIN" in others:
-                type_specific_notes.append(f"PIN: {field(others.get('Bank_PIN'))}")
-
-        elif item_type == "driver":
-            if "Driver_Number" in others:
-                type_specific_notes.append(f"License Number: {field(others.get('Driver_Number'))}")
-            if "Driver_Birthday" in others:
-                type_specific_notes.append(f"Birthday: {field(others.get('Driver_Birthday'))}")
-            if "Driver_Issue" in others:
-                type_specific_notes.append(f"Issue Date: {field(others.get('Driver_Issue'))}")
-            if "Driver_Expiry" in others:
-                type_specific_notes.append(f"Expiry Date: {field(others.get('Driver_Expiry'))}")
-            if "Driver_Gender" in others:
-                type_specific_notes.append(f"Gender: {field(others.get('Driver_Gender'))}")
-            if "Driver_Address" in others:
-                type_specific_notes.append(f"Address: {field(others.get('Driver_Address'))}")
-            if "Driver_City_Town" in others:
-                type_specific_notes.append(f"City: {field(others.get('Driver_City_Town'))}")
-
-        elif item_type == "router":
-            if "Router_Password" in others:
-                type_specific_notes.append(f"Password: {field(others.get('Router_Password'))}")
-
-        secure_text = "\n".join(type_specific_notes) if type_specific_notes else secure_text
+    secure_text = "\n".join(lines) if lines else field(others.get("Secure_Note"))
 
     # the secure note body is the main content.
     # if the Notes column also has text we keep both joined together.
@@ -318,6 +244,100 @@ def build_secure_note(others: dict, name: str, notes: str, favorite: bool, item_
     item = base_item(SECURE_NOTE_TYPE, name, combined, favorite)
     item["secureNote"] = {"type": 0}
     return item
+
+
+def name_lines(others: dict, prefix: str):
+    """First/Last name lines, checking both bare and prefixed keys."""
+
+    # the prefix in the JSON is Title Case (Driver, Bank, Router) or all caps (ID)
+    lines = []
+    first_name = field(others.get("First_Name") or others.get(f"{prefix}_First_Name"))
+    if first_name:
+        lines.append(f"First Name: {first_name}")
+    last_name = field(others.get("Last_Name") or others.get(f"{prefix}_Last_Name"))
+    if last_name:
+        lines.append(f"Last Name: {last_name}")
+    return lines
+
+
+def build_secure_note(others: dict, name: str, notes: str, favorite: bool):
+    """Build a plain bitwarden secure note item from a C2 row and its Others data."""
+
+    return note_item([], others, name, notes, favorite)
+
+
+def build_id(others: dict, name: str, notes: str, favorite: bool):
+    """Build a secure note item from a C2 ID record."""
+
+    lines = name_lines(others, "ID")
+    for key, label in (
+        ("ID_Number", "ID Number"),
+        ("ID_Birthday", "Birthday"),
+        ("ID_Nationality", "Nationality"),
+        ("ID_Birth_Place", "Birth Place"),
+        ("ID_Issue", "Issue Date"),
+        ("ID_Expiry", "Expiry Date"),
+        ("ID_Gender", "Gender"),
+    ):
+        if key in others:
+            lines.append(f"{label}: {field(others.get(key))}")
+
+    # ID Address can be a nested object
+    addr_data = others.get("ID_Address")
+    if isinstance(addr_data, dict):
+        if "Address" in addr_data:
+            lines.append(f"Address: {field(addr_data.get('Address'))}")
+        if "City_Town" in addr_data:
+            lines.append(f"City: {field(addr_data.get('City_Town'))}")
+
+    return note_item(lines, others, name, notes, favorite)
+
+
+def build_bank(others: dict, name: str, notes: str, favorite: bool):
+    """Build a secure note item from a C2 bank account record."""
+
+    lines = name_lines(others, "Bank")
+    for key, label in (
+        ("Bank_Name", "Bank"),
+        ("Bank_Account", "Account"),
+        ("Bank_Acc_Type", "Account Type"),
+        ("Bank_Branch", "Branch"),
+        ("Bank_Routing", "Routing"),
+        ("Bank_PIN", "PIN"),
+    ):
+        if key in others:
+            lines.append(f"{label}: {field(others.get(key))}")
+
+    return note_item(lines, others, name, notes, favorite)
+
+
+def build_driver(others: dict, name: str, notes: str, favorite: bool):
+    """Build a secure note item from a C2 driver's license record."""
+
+    lines = name_lines(others, "Driver")
+    for key, label in (
+        ("Driver_Number", "License Number"),
+        ("Driver_Birthday", "Birthday"),
+        ("Driver_Issue", "Issue Date"),
+        ("Driver_Expiry", "Expiry Date"),
+        ("Driver_Gender", "Gender"),
+        ("Driver_Address", "Address"),
+        ("Driver_City_Town", "City"),
+    ):
+        if key in others:
+            lines.append(f"{label}: {field(others.get(key))}")
+
+    return note_item(lines, others, name, notes, favorite)
+
+
+def build_router(others: dict, name: str, notes: str, favorite: bool):
+    """Build a secure note item from a C2 router record."""
+
+    lines = name_lines(others, "Router")
+    if "Router_Password" in others:
+        lines.append(f"Password: {field(others.get('Router_Password'))}")
+
+    return note_item(lines, others, name, notes, favorite)
 
 
 def convert(rows: list[dict]):
@@ -345,10 +365,19 @@ def convert(rows: list[dict]):
                     items.append(build_card(row, others, name, notes, favorite))
 
                 case "secure":
-                    items.append(build_secure_note(others, name, notes, favorite, item_type))
+                    items.append(build_secure_note(others, name, notes, favorite))
 
-                case "id" | "bank" | "driver" | "router":
-                    items.append(build_secure_note(others, name, notes, favorite, item_type))
+                case "id":
+                    items.append(build_id(others, name, notes, favorite))
+
+                case "bank":
+                    items.append(build_bank(others, name, notes, favorite))
+
+                case "driver":
+                    items.append(build_driver(others, name, notes, favorite))
+
+                case "router":
+                    items.append(build_router(others, name, notes, favorite))
 
                 case _:  # default to login if the type is unknown or missing
                     username = field(row.get("Login_Username"))
