@@ -1,7 +1,7 @@
-# SynologyC2Password to Bitwarden formatter/translater
+# SynologyC2Password to Bitwarden migrator
 
 ## Description
-Converts a Synology C2 Password export (`.csv`) into a Bitwarden/Vaultwarden importable `.json` (logins, payment cards, and secure notes ONLY).
+Converts a Synology C2 Password export (`.csv`) into a Bitwarden/Vaultwarden importable `.json`. Logins and payment cards map to their matching Bitwarden types while secure notes and several other C2 categories (ID, bank account, driver's license, router) are converted to Bitwarden secure notes to be able to migrate everything we can.
 
 ## Getting Started
 First, let's export those juicy passwords from Synology C2 Password:
@@ -102,9 +102,11 @@ Payment cards map:
 
 Secure notes map `Secure_Note` (from `Others`) into the note body.
 
+Other categories become secure notes too. Bitwarden has no matching item type for C2's ID (well they do, just not all fields), bank account, driver's license, and router entries, so each is converted to a secure note with its fields flattened into the note body. If an entry has no recognized fields but does have a `Secure_Note` value, that text is used as-is.
+
 ### Limitations
 - Outputs Bitwarden (`.json`). Import using the `Bitwarden (json)` file format.
-- Converts logins, payment cards, and secure notes. Other C2 categories (Identity, Bank Account, etc) are not transferred yet. The script lists anything it skips so nothing disappears silently.
+- Converts logins and payment cards to their native Bitwarden types, and secure notes plus ID, bank account, driver's license, and router entries to Bitwarden secure notes. Any other/unrecognized C2 category is still skipped, and the script lists anything it skips so nothing disappears silently.
 - Folders are not created. Pick a destination folder in the import screen.
 - "Match detection" is not transferred.
 
