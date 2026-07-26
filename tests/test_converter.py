@@ -216,6 +216,6 @@ class TestConvert:
                           ' "Custom": [{"Type": "Text", "Text_Title": "Bank Line", "Text": "info"}]}',
             }
         ]
-        items, skipped = convert(rows)
+        items, _skipped = convert(rows)
         assert items[0]["type"] == CARD_TYPE
         assert items[0]["fields"][-1] == {"name": "Bank Line", "value": "info", "type": 0}
