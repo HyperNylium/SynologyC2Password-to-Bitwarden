@@ -431,7 +431,7 @@ def convert(rows: list[dict]):
                     password = field(row.get("Login_Password"))
                     uris = build_uris(row.get("Login_URLs"))
 
-                    if username or password or uris or extras:
+                    if username or password or uris or (extras and not item_type):
                         item = build_login(row, name, notes, favorite)
                     elif others is not None:
                         reason = f"unsupported type '{others.get('Type')}'"
