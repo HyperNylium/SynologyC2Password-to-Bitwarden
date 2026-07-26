@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from syno2bw import (
-    is_value_present, field, build_uris, custom_field, custom_fields,
+    is_value_present, field, build_uris, custom_field, build_custom_fields,
     parse_others, parse_expiry, normalize_brand,
     TEXT_FIELD, HIDDEN_FIELD
 )
@@ -194,12 +194,12 @@ class TestNormalizeBrand:
 
 
 class TestCustomFields:
-    """Tests for custom_fields function."""
+    """Tests for build_custom_fields function."""
 
     def test_none_and_missing(self):
-        assert custom_fields(None) == []
-        assert custom_fields({}) == []
-        assert custom_fields({"Custom": "not a list"}) == []
+        assert build_custom_fields(None) == []
+        assert build_custom_fields({}) == []
+        assert build_custom_fields({"Custom": "not a list"}) == []
 
     def test_autofill_web_text_and_password(self):
         others = {
@@ -220,7 +220,7 @@ class TestCustomFields:
                 },
             ]
         }
-        fields = custom_fields(others)
+        fields = build_custom_fields(others)
         assert fields == [
             {"name": "Email", "value": "me@example.com", "type": TEXT_FIELD},
             {"name": "Password Confirm", "value": "secret", "type": HIDDEN_FIELD},
@@ -228,16 +228,16 @@ class TestCustomFields:
 
     def test_password_entry_is_hidden(self):
         others = {"Custom": [{"Type": "Password", "Password_Title": "API", "Password": "key123"}]}
-        fields = custom_fields(others)
+        fields = build_custom_fields(others)
         assert fields == [{"name": "API", "value": "key123", "type": HIDDEN_FIELD}]
 
     def test_missing_title_falls_back_to_type(self):
         others = {"Custom": [{"Type": "Text", "Text": "hello"}]}
-        assert custom_fields(others)[0]["name"] == "Text"
+        assert build_custom_fields(others)[0]["name"] == "Text"
 
     def test_unknown_type_uses_first_value_key(self):
         others = {"Custom": [{"Type": "Mystery", "Mystery_Title": "Thing", "Value": "42"}]}
-        assert custom_fields(others) == [{"name": "Thing", "value": "42", "type": TEXT_FIELD}]
+        assert build_custom_fields(others) == [{"name": "Thing", "value": "42", "type": TEXT_FIELD}]
 
     def test_skips_blank_and_non_dict_entries(self):
         others = {
@@ -247,4 +247,38 @@ class TestCustomFields:
                 {"Type": "Password", "Password_Title": "Kept", "Password": "v"},
             ]
         }
-        assert [f["name"] for f in custom_fields(others)] == ["Kept"]
+        assert [f["name"] for f in build_custom_fields(others)] == ["Kept"]
+
+    def test_blank_typed_value_keeps_searching(self):
+        """A blank value under the type key should not stop the fallback search."""
+
+        others = {
+            "Custom": [
+                {"Type": "Password", "Password_Title": "API", "Password": None, "Note": "real"}
+            ]
+        }
+        assert build_custom_fields(others) == [
+            {"name": "API", "value": "real", "type": HIDDEN_FIELD}
+        ]
+
+    def test_nested_value_is_kept_as_json(self):
+        """Bitwarden fields are text, so a nested object must not become a python repr."""
+
+        others = {
+            "Custom": [
+                {"Type": "Address", "Address_Title": "Home", "Address": {"City": "X", "Zip": "1"}}
+            ]
+        }
+        assert build_custom_fields(others) == [
+            {"name": "Home", "value": '{"City": "X", "Zip": "1"}', "type": TEXT_FIELD}
+        ]
+
+    def test_skips_empty_nested_values(self):
+        others = {"Custom": [{"Type": "Address", "Address_Title": "Home", "Address": {}}]}
+        assert build_custom_fields(others) == []
+
+    def test_unnamed_entry_falls_back_to_position(self):
+        others = {"Custom": [{"Value": "orphan"}]}
+        assert build_custom_fields(others) == [
+            {"name": "Custom_1", "value": "orphan", "type": TEXT_FIELD}
+        ]

@@ -219,3 +219,16 @@ class TestConvert:
         items, _skipped = convert(rows)
         assert items[0]["type"] == CARD_TYPE
         assert items[0]["fields"][-1] == {"name": "Bank Line", "value": "info", "type": 0}
+
+    def test_convert_unsupported_type_with_custom_fields_is_still_skipped(self):
+        """Custom fields must not turn an unsupported category into a half empty login."""
+        rows = [
+            {
+                "Display_Name": "My Wifi",
+                "Others": '{"Type": "Wifi", "Wifi_SSID": "home", "Wifi_Password": "secret",'
+                          ' "Custom": [{"Type": "Text", "Text_Title": "Note", "Text": "keep"}]}',
+            }
+        ]
+        items, skipped = convert(rows)
+        assert items == []
+        assert skipped == [("My Wifi", "unsupported type 'Wifi'")]

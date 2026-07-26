@@ -81,6 +81,16 @@ def field(value: str | None):
     return str(value) if is_value_present(value) else ""
 
 
+def text_value(value):
+    """Text for one custom field value. Nested objects are kept as json, not a python repr."""
+
+    if isinstance(value, (dict, list)):
+        # an empty object holds nothing worth importing, so treat it as blank
+        return json.dumps(value, ensure_ascii=False) if value else ""
+
+    return field(value)
+
+
 def build_uris(raw: str | None):
     """Turn the C2 URL lines into the bitwarden uris list."""
 
@@ -107,7 +117,7 @@ def custom_field(name: str, value: str | None, field_type: int):
     }
 
 
-def custom_fields(others: dict | None):
+def build_custom_fields(others: dict | None):
     """Turn the Others "Custom" list into bitwarden custom fields."""
 
     if not isinstance(others, dict):
@@ -126,15 +136,19 @@ def custom_fields(others: dict | None):
 
         # each entry keeps its value under a key named after its own type, like
         # {"Type": "Password", "Password_Title": "API", "Password": "secret"}
-        value = entry.get(kind) if kind else None
-        if value is None:
-            # unknown type, so take the first key that is not one of the metadata keys
+        value = text_value(entry.get(kind)) if kind else ""
+        if not value:
+            # unknown type or nothing under that key, so take the first key
+            # that is not one of the metadata keys and actually holds something
             for key, candidate in entry.items():
-                if key != "Type" and not key.endswith(("_Title", "_Type", "_Selector")):
-                    value = candidate
+                if key in ("Type", kind) or key.endswith(("_Title", "_Type", "_Selector")):
+                    continue
+
+                value = text_value(candidate)
+                if value:
                     break
 
-        if not is_value_present(value):
+        if not value:
             continue
 
         # the title is what the user named the field in C2
@@ -404,7 +418,7 @@ def convert(rows: list[dict]):
                 item_type = str(others.get("Type", "")).strip().lower()
 
             # any item type can carry user defined fields in the Others json
-            extras = custom_fields(others)
+            extras = build_custom_fields(others)
 
             item = None
             match item_type:
