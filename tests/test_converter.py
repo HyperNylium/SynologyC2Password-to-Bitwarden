@@ -168,3 +168,54 @@ class TestConvert:
         items, skipped = convert([])
         assert len(items) == 0
         assert len(skipped) == 0
+
+    def test_convert_login_with_custom_fields(self):
+        others = (
+            '{"Custom": ['
+            '{"Type": "AutofillWeb", "AutofillWeb_Title": "Email", "AutofillWeb_Type": "text",'
+            ' "AutofillWeb": "me@example.com", "AutofillWeb_Selector": "#email"},'
+            '{"Type": "Password", "Password_Title": "API", "Password": "key123"}'
+            ']}'
+        )
+        rows = [
+            {
+                "Display_Name": "themoviedb",
+                "Login_Username": "user",
+                "Login_Password": "pass",
+                "Login_URLs": "https://www.themoviedb.org",
+                "Others": others,
+            }
+        ]
+        items, skipped = convert(rows)
+        assert len(items) == 1
+        assert items[0]["type"] == LOGIN_TYPE
+        assert [(f["name"], f["value"], f["type"]) for f in items[0]["fields"]] == [
+            ("Email", "me@example.com", 0),
+            ("API", "key123", 1),
+        ]
+        assert len(skipped) == 0
+
+    def test_convert_custom_fields_only_still_imported(self):
+        """A row with no login info but custom fields should not be skipped."""
+        rows = [
+            {
+                "Display_Name": "Only Custom",
+                "Others": '{"Custom": [{"Type": "Password", "Password_Title": "API", "Password": "k"}]}',
+            }
+        ]
+        items, skipped = convert(rows)
+        assert len(items) == 1
+        assert items[0]["fields"][0]["name"] == "API"
+        assert len(skipped) == 0
+
+    def test_convert_card_keeps_custom_fields(self):
+        rows = [
+            {
+                "Display_Name": "My Card",
+                "Others": '{"Type": "Card", "Card_Number": "4111111111111111",'
+                          ' "Custom": [{"Type": "Text", "Text_Title": "Bank Line", "Text": "info"}]}',
+            }
+        ]
+        items, skipped = convert(rows)
+        assert items[0]["type"] == CARD_TYPE
+        assert items[0]["fields"][-1] == {"name": "Bank Line", "value": "info", "type": 0}

@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from syno2bw import (
-    is_value_present, field, build_uris, custom_field,
+    is_value_present, field, build_uris, custom_field, custom_fields,
     parse_others, parse_expiry, normalize_brand,
     TEXT_FIELD, HIDDEN_FIELD
 )
@@ -191,3 +191,60 @@ class TestNormalizeBrand:
 
     def test_jcb(self):
         assert normalize_brand("jcb") == "JCB"
+
+
+class TestCustomFields:
+    """Tests for custom_fields function."""
+
+    def test_none_and_missing(self):
+        assert custom_fields(None) == []
+        assert custom_fields({}) == []
+        assert custom_fields({"Custom": "not a list"}) == []
+
+    def test_autofill_web_text_and_password(self):
+        others = {
+            "Custom": [
+                {
+                    "Type": "AutofillWeb",
+                    "AutofillWeb_Title": "Email",
+                    "AutofillWeb_Type": "text",
+                    "AutofillWeb": "me@example.com",
+                    "AutofillWeb_Selector": "#email",
+                },
+                {
+                    "Type": "AutofillWeb",
+                    "AutofillWeb_Title": "Password Confirm",
+                    "AutofillWeb_Type": "password",
+                    "AutofillWeb": "secret",
+                    "AutofillWeb_Selector": "#password_confirm",
+                },
+            ]
+        }
+        fields = custom_fields(others)
+        assert fields == [
+            {"name": "Email", "value": "me@example.com", "type": TEXT_FIELD},
+            {"name": "Password Confirm", "value": "secret", "type": HIDDEN_FIELD},
+        ]
+
+    def test_password_entry_is_hidden(self):
+        others = {"Custom": [{"Type": "Password", "Password_Title": "API", "Password": "key123"}]}
+        fields = custom_fields(others)
+        assert fields == [{"name": "API", "value": "key123", "type": HIDDEN_FIELD}]
+
+    def test_missing_title_falls_back_to_type(self):
+        others = {"Custom": [{"Type": "Text", "Text": "hello"}]}
+        assert custom_fields(others)[0]["name"] == "Text"
+
+    def test_unknown_type_uses_first_value_key(self):
+        others = {"Custom": [{"Type": "Mystery", "Mystery_Title": "Thing", "Value": "42"}]}
+        assert custom_fields(others) == [{"name": "Thing", "value": "42", "type": TEXT_FIELD}]
+
+    def test_skips_blank_and_non_dict_entries(self):
+        others = {
+            "Custom": [
+                "junk",
+                {"Type": "Password", "Password_Title": "Empty", "Password": ""},
+                {"Type": "Password", "Password_Title": "Kept", "Password": "v"},
+            ]
+        }
+        assert [f["name"] for f in custom_fields(others)] == ["Kept"]
