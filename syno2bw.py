@@ -107,6 +107,49 @@ def custom_field(name: str, value: str | None, field_type: int):
     }
 
 
+def custom_fields(others: dict | None):
+    """Turn the Others "Custom" list into bitwarden custom fields."""
+
+    if not isinstance(others, dict):
+        return []
+
+    entries = others.get("Custom")
+    if not isinstance(entries, list):
+        return []
+
+    fields = []
+    for index, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict):
+            continue
+
+        kind = str(entry.get("Type", "")).strip()
+
+        # each entry keeps its value under a key named after its own type, like
+        # {"Type": "Password", "Password_Title": "API", "Password": "secret"}
+        value = entry.get(kind) if kind else None
+        if value is None:
+            # unknown type, so take the first key that is not one of the metadata keys
+            for key, candidate in entry.items():
+                if key != "Type" and not key.endswith(("_Title", "_Type", "_Selector")):
+                    value = candidate
+                    break
+
+        if not is_value_present(value):
+            continue
+
+        # the title is what the user named the field in C2
+        name = field(entry.get(f"{kind}_Title")).strip() or kind or f"Custom_{index}"
+
+        # synology marks secret values either by the entry type ("Password")
+        # or by the input type it captured from the web form
+        input_type = field(entry.get(f"{kind}_Type")).strip().lower()
+        hidden = kind.lower() == "password" or input_type == "password"
+
+        fields.append(custom_field(name, value, HIDDEN_FIELD if hidden else TEXT_FIELD))
+
+    return fields
+
+
 def parse_expiry(raw: str | None):
     """Pull month and year out of a card expiry like 01/28. Returns (month, year, raw_if_bad)."""
 
@@ -360,37 +403,45 @@ def convert(rows: list[dict]):
             if others is not None:
                 item_type = str(others.get("Type", "")).strip().lower()
 
+            # any item type can carry user defined fields in the Others json
+            extras = custom_fields(others)
+
+            item = None
             match item_type:
                 case "card":
-                    items.append(build_card(row, others, name, notes, favorite))
+                    item = build_card(row, others, name, notes, favorite)
 
                 case "secure":
-                    items.append(build_secure_note(others, name, notes, favorite))
+                    item = build_secure_note(others, name, notes, favorite)
 
                 case "id":
-                    items.append(build_id(others, name, notes, favorite))
+                    item = build_id(others, name, notes, favorite)
 
                 case "bank":
-                    items.append(build_bank(others, name, notes, favorite))
+                    item = build_bank(others, name, notes, favorite)
 
                 case "driver":
-                    items.append(build_driver(others, name, notes, favorite))
+                    item = build_driver(others, name, notes, favorite)
 
                 case "router":
-                    items.append(build_router(others, name, notes, favorite))
+                    item = build_router(others, name, notes, favorite)
 
                 case _:  # default to login if the type is unknown or missing
                     username = field(row.get("Login_Username"))
                     password = field(row.get("Login_Password"))
                     uris = build_uris(row.get("Login_URLs"))
 
-                    if username or password or uris:
-                        items.append(build_login(row, name, notes, favorite))
+                    if username or password or uris or extras:
+                        item = build_login(row, name, notes, favorite)
                     elif others is not None:
                         reason = f"unsupported type '{others.get('Type')}'"
                         skipped.append((name, reason))
                     else:
                         skipped.append((name, "no login info"))
+
+            if item is not None:
+                item["fields"].extend(extras)
+                items.append(item)
 
         except Exception:
             # if one row blows up, skip it instead of crashing the whole run
